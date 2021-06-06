@@ -41,9 +41,9 @@ if [ "$1" = "-b" ]; then
     bootable="-o bootimage=i386;$BASEBITSDIR/boot/cdboot -o no-emul-boot"
 
     # Make EFI system partition (should be done with makefs in the future)
-    dd if=/dev/zero of=efiboot.img bs=4k count=200
+    dd if=/dev/zero of=efiboot.img bs=1k count=2048
     device=`mdconfig -a -t vnode -f efiboot.img`
-    newfs_msdos -F 12 -m 0xf8 /dev/$device
+    newfs_msdos -F 12 -m 0xf8 -L ESP /dev/$device
     mkdir efi
     mount -t msdosfs /dev/$device efi
     mkdir -p efi/efi/boot
@@ -71,7 +71,7 @@ fi
 LABEL=`echo "$1" | tr '[:lower:]' '[:upper:]'`; shift
 NAME="$1"; shift
 
-publisher="FuryBSD"
+publisher="HardenedBSD"
 echo "/dev/iso9660/$LABEL / cd9660 ro 0 0" > "$BASEBITSDIR/etc/fstab"
 $MAKEFS -t cd9660 $bootable -o rockridge -o label="$LABEL" -o publisher="$publisher" "$NAME" "$@" $OVERLAY_DIR
 rm -f "$BASEBITSDIR/etc/fstab"
@@ -94,8 +94,8 @@ if [ "$bootable" != "" ]; then
     $MKIMG -s gpt \
         --capacity $imgsize \
         -b "$BASEBITSDIR/boot/pmbr" \
-        $espparam \
         -p freebsd-boot:="$BASEBITSDIR/boot/isoboot" \
+        $espparam \
         -o hybrid.img
 
     # Drop the PMBR, GPT, and boot code into the System Area of the ISO.

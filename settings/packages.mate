@@ -3,5 +3,7 @@ lightdm-gtk-greeter
 mate-icon-theme
 firefox
 zenity
-sysctlview
-# networkmgr
+vlc
+station-tweak
+#networkmgr
+ibus

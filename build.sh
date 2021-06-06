@@ -3,7 +3,7 @@
 # Exit on errors
 set -e
 
-version="12.1"
+version="12-stable"
 pkgset="branches/2020Q1" # TODO: Use it
 desktop=$1
 tag=$2
@@ -26,8 +26,8 @@ iso="${livecd}/iso"
 uzip="${livecd}/uzip"
 cdroot="${livecd}/cdroot"
 ramdisk_root="${cdroot}/data/ramdisk"
-vol="furybsd"
-label="FURYBSD"
+vol="hardenedbsd"
+label="HARDENEDBSD"
 export DISTRIBUTIONS="kernel.txz base.txz"
 
 # Only run as superuser
@@ -58,14 +58,14 @@ fi
 # Get the version tag
 if [ -z "$2" ] ; then
   rm /usr/local/furybsd/tag >/dev/null 2>/dev/null || true
-  export vol="FuryBSD-${version}-${edition}"
+  export vol="HardenedBSD-${version}-${edition}"
 else
   rm /usr/local/furybsd/version >/dev/null 2>/dev/null || true
   echo "${2}" > /usr/local/furybsd/tag
-  export vol="FuryBSD-${version}-${edition}-${tag}"
+  export vol="HardenedBSD-${version}-${edition}-${tag}"
 fi
 
-label="FURYBSD"
+label="HARDENEDBSD"
 isopath="${iso}/${vol}-${arch}.iso"
 
 cleanup()
@@ -100,15 +100,21 @@ base()
   # TODO: Signature checking
   if [ ! -f "${base}/base.txz" ] ; then 
     cd ${base}
-    fetch https://download.freebsd.org/ftp/releases/${arch}/${version}-RELEASE/base.txz
+    fetch https://ci-01.nyi.hardenedbsd.org/pub/hardenedbsd/${version}/${arch}/${arch}/BUILD-LATEST/base.txz
   fi
   
   if [ ! -f "${base}/kernel.txz" ] ; then
     cd ${base}
-    fetch https://download.freebsd.org/ftp/releases/${arch}/${version}-RELEASE/kernel.txz
+    fetch https://ci-01.nyi.hardenedbsd.org/pub/hardenedbsd/${version}/${arch}/${arch}/BUILD-LATEST/kernel.txz
+  fi
+  if [ ! -f "${base}/kernel-fbsd.txz" ] ; then
+    cd ${base}
+    fetch https://download.freebsd.org/ftp/releases/amd64/12.2-RELEASE/kernel.txz -o kernel-fbsd.txz
   fi
   cd ${base}
   tar -zxvf base.txz -C ${uzip}
+  tar -C ${uzip} -zxvf kernel-fbsd.txz boot/kernel
+  mv ${uzip}/boot/kernel ${uzip}/boot/kernel-fbsd
   tar -zxvf kernel.txz -C ${uzip}
   touch ${uzip}/etc/fstab
 }

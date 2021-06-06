@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3.8
 # Unfortunately python3 does not seem to work on FreeBSD
 
 # Install FreeBSD
@@ -36,9 +36,9 @@ from datetime import datetime
 import urllib.request
 import urllib.error
 import json
-from PyQt5 import QtWidgets, QtGui, QtCore  # pkg install py37-qt5-widgets
+from PyQt5 import QtWidgets, QtGui, QtCore  # pkg install py38-qt5-widgets
 # PySide2 wants to install 1 GB whereas PyQt5 only needs 40 MB installed on FuryBSD XFCE
-# from PyQt5 import QtMultimedia # pkg install  py37-qt5-multimedia
+# from PyQt5 import QtMultimedia # pkg install  py38-qt5-multimedia
 # QtMultimedia is used for playing the success sound; using mpg123 for now instead
 
 import disks  # Privately bundled file
@@ -102,7 +102,7 @@ def show_the_no_password_warning(sender):
 # https://doc.qt.io/qt-5/qwizard.html
 #############################################################################
 
-print("Install FreeBSD")
+print("Install HardenedBSD")
 
 app = QtWidgets.QApplication(sys.argv)
 
@@ -138,7 +138,7 @@ class InstallWizard(QtWidgets.QWizard, object):
         # self.setButtonLayout(
         #     [QtWidgets.QWizard.CustomButton1, QtWidgets.QWizard.Stretch, QtWidgets.QWizard.NextButton])
 
-        self.setWindowTitle("Install FreeBSD")
+        self.setWindowTitle("Install HardenedBSD")
         self.setFixedSize(800, 550)
 
         # Remove window decorations, especially the close button
@@ -565,7 +565,7 @@ class IntroPage(QtWidgets.QWizardPage, object):
         print("Preparing IntroPage")
         super().__init__()
 
-        self.setTitle('Install FreeBSD')
+        self.setTitle('Install HardenedBSD')
         self.setSubTitle("To set up the installation of FreeBSD, click 'Continue'.")
 
         logo_pixmap = QtGui.QPixmap(os.path.dirname(__file__) + '/FREEBSD_Logo_Vert_Pos_RGB.png').scaledToHeight(200, QtCore.Qt.SmoothTransformation)

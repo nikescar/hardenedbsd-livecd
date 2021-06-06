@@ -13,15 +13,13 @@ xf86-video-scfb
 xf86-video-vesa
 xf86-video-vmware
 xf86-video-qxl # !i386
-drm-kmod
-drm-legacy-kmod
 libva-intel-driver
 drm-kmod
 nvidia-driver # !i386
 mesa-libs
 mesa-dri
 open-vm-tools
-virtualbox-ose-additions
+# virtualbox-ose-additions
 xauth
 xinit
 setxkbmap
@@ -33,14 +31,11 @@ git
 bash
 usbids
 wpa_supplicant_gui
-webcamd
-webcamoid
 utouch-kmod
 pv
 cpdup
-iichid
 avahi-app
 nss_mdns
 openntpd
-py37-qt5-widgets
+py38-qt5-widgets
 freedesktop-sound-theme

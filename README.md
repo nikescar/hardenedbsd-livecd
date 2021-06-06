@@ -1,6 +1,6 @@
-LiveCD builder for FuryBSD
+LiveCD builder for HardenedBSD
 
-Last updated 10/31/2020
+Last updated 06/05/2021
 
 ## End-of-life notice for community ISO images
 Thank you for your interest in FuryBSD.  This project has been discontinued.  Plans to publish Q4 2020 images have been cancelled.
@@ -61,12 +61,12 @@ Burn the XFCE image to DVD:
 
 ```
 pkg install cdrtools
-cdrecord /usr/local/furybsd/iso/FuryBSD-12.1-XFCE.iso
+cdrecord /usr/local/furybsd/iso/HardenedBSD-12-stable-XFCE-amd64.iso
 ```
 
 Write the XFCE image to USB stick:
 ```
-sudo dd if=/usr/local/furybsd/iso/FuryBSD-12.1-XFCE.iso of=/dev/daX bs=4m status=progress
+sudo dd if=/usr/local/furybsd/iso/HardenedBSD-12-stable-XFCE-amd64.iso of=/dev/daX bs=4m status=progress
 ```
 
 ## Credentials for live media
