@@ -1,5 +1,6 @@
 pkg
 sudo
+octopkg
 nano
 tmux
 xorg-server
@@ -27,14 +28,12 @@ xdg-user-dirs
 xdg-utils
 doas
 xterm
-git
+git-lite
 bash
 usbids
 wpa_supplicant_gui
-pv
 cpdup
 avahi-app
 nss_mdns
-openntpd
 py38-qt5-widgets
 freedesktop-sound-theme

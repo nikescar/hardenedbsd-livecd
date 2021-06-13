@@ -1,9 +1,7 @@
 mate
 lightdm-gtk-greeter
-mate-icon-theme
 firefox
 zenity
-# networkmgr
 totem
 station-tweak
 ibus
