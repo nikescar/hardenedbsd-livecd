@@ -2,6 +2,8 @@
 
 PATH="/rescue"
 
+echo "==> init.sh"
+
 if [ "`ps -o command 1 | tail -n 1 | ( read c o; echo ${o} )`" = "-s" ]; then
 	echo "==> Running in single-user mode"
 	SINGLE_USER="true"
