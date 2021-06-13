@@ -109,7 +109,8 @@ base()
   fi
   if [ ! -f "${base}/kernel-fbsd.txz" ] ; then
     cd ${base}
-    fetch https://download.freebsd.org/ftp/releases/amd64/12.2-RELEASE/kernel.txz -o kernel-fbsd.txz
+    #fetch https://download.freebsd.org/ftp/releases/amd64/12.2-RELEASE/kernel.txz -o kernel-fbsd.txz
+    fetch https://download.freebsd.org/ftp/snapshots/amd64/12.2-STABLE/kernel.txz -o kernel-fbsd.txz
   fi
   cd ${base}
   tar -zxvf base.txz -C ${uzip}
@@ -241,9 +242,10 @@ ramdisk()
 boot() 
 {
   cp -R "${cwd}/overlays/boot/" "${cdroot}"
-  cd "${uzip}" && tar -cf - --exclude boot/kernel boot | tar -xf - -C "${cdroot}"
-  for kfile in kernel geom_uzip.ko opensolaris.ko tmpfs.ko xz.ko zfs.ko; do
-  tar -cf - boot/kernel/${kfile} | tar -xf - -C "${cdroot}"
+  cd "${uzip}" && tar -cf - --exclude boot/kernel --exclude boot/kernel-fbsd boot | tar -xf - -C "${cdroot}"
+  rm -rf "${cdroot}"/boot/modules/*
+  for kfile in kernel geom_uzip.ko opensolaris.ko tmpfs.ko xz.ko zfs.ko cryptodev.ko geom_mirror.ko; do
+  tar -cf - boot/kernel/${kfile} boot/kernel-fbsd/${kfile} | tar -xf - -C "${cdroot}"
   done
   cd ${cwd} && zpool export furybsd && mdconfig -d -u 0
 }
