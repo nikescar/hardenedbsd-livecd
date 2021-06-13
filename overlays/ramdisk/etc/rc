@@ -3,7 +3,7 @@
 echo "==> rc ramdisk script"
 
 if [ ! -e /dev/md2 ] ; then
-  halt -p
+    sh init.sh
 fi
 
 echo "==> Unset rescue init kernel environment variables"
