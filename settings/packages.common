@@ -31,7 +31,6 @@ git
 bash
 usbids
 wpa_supplicant_gui
-utouch-kmod
 pv
 cpdup
 avahi-app
