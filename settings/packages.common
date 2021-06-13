@@ -13,10 +13,10 @@ xf86-video-cirrus
 xf86-video-scfb
 xf86-video-vesa
 xf86-video-vmware
-xf86-video-qxl # !i386
+xf86-video-qxl
 libva-intel-driver
 drm-kmod
-nvidia-driver # !i386
+nvidia-driver
 mesa-libs
 mesa-dri
 open-vm-tools
