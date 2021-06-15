@@ -6,7 +6,6 @@ set -e
 version="12-stable"
 pkgset="branches/2020Q1" # TODO: Use it
 desktop=$1
-tag=$2
 cwd=$(realpath | sed 's|/scripts||g')
 workdir="/usr/local"
 livecd="${workdir}/furybsd"
@@ -55,16 +54,7 @@ if [ ! -f "${cwd}/settings/packages.${desktop}" ] ; then
   exit 1
 fi
 
-# Get the version tag
-if [ -z "$2" ] ; then
-  rm /usr/local/furybsd/tag >/dev/null 2>/dev/null || true
-  export vol="HardenedBSD-${version}-${edition}"
-else
-  rm /usr/local/furybsd/version >/dev/null 2>/dev/null || true
-  echo "${2}" > /usr/local/furybsd/tag
-  export vol="HardenedBSD-${version}-${edition}-${tag}"
-fi
-
+export vol="HardenedBSD-${version}-${edition}"
 label="HARDENEDBSD"
 isopath="${iso}/${vol}-${arch}.iso"
 
