@@ -3,7 +3,7 @@
 # Exit on errors
 set -e
 
-version="12-stable"
+version="13-stable"
 pkgset="branches/2020Q1" # TODO: Use it
 desktop=$1
 cwd=$(realpath | sed 's|/scripts||g')
@@ -90,17 +90,16 @@ base()
   # TODO: Signature checking
   if [ ! -f "${base}/base.txz" ] ; then 
     cd ${base}
-    fetch https://ci-01.nyi.hardenedbsd.org/pub/hardenedbsd/${version}/${arch}/${arch}/BUILD-LATEST/base.txz
+    fetch -v https://ci-01.nyi.hardenedbsd.org/pub/hardenedbsd/${version}/${arch}/${arch}/BUILD-LATEST/base.txz
   fi
   
   if [ ! -f "${base}/kernel.txz" ] ; then
     cd ${base}
-    fetch https://ci-01.nyi.hardenedbsd.org/pub/hardenedbsd/${version}/${arch}/${arch}/BUILD-LATEST/kernel.txz
+    fetch -v https://ci-01.nyi.hardenedbsd.org/pub/hardenedbsd/${version}/${arch}/${arch}/BUILD-LATEST/kernel.txz
   fi
   if [ ! -f "${base}/kernel-fbsd.txz" ] ; then
     cd ${base}
-    #fetch https://download.freebsd.org/ftp/releases/amd64/12.2-RELEASE/kernel.txz -o kernel-fbsd.txz
-    fetch https://download.freebsd.org/ftp/snapshots/amd64/12.2-STABLE/kernel.txz -o kernel-fbsd.txz
+    fetch -v https://download.freebsd.org/ftp/snapshots/amd64/13.0-STABLE/kernel.txz -o kernel-fbsd.txz
   fi
   cd ${base}
   tar -zxvf base.txz -C ${uzip}
@@ -234,7 +233,7 @@ boot()
   cp -R "${cwd}/overlays/boot/" "${cdroot}"
   cd "${uzip}" && tar -cf - --exclude boot/kernel --exclude boot/kernel-fbsd boot | tar -xf - -C "${cdroot}"
   rm -rf "${cdroot}"/boot/modules/*
-  for kfile in kernel geom_uzip.ko opensolaris.ko tmpfs.ko xz.ko zfs.ko cryptodev.ko geom_mirror.ko; do
+  for kfile in kernel geom_uzip.ko cryptodev.ko tmpfs.ko xz.ko zfs.ko; do
   tar -cf - boot/kernel/${kfile} boot/kernel-fbsd/${kfile} | tar -xf - -C "${cdroot}"
   done
   cd ${cwd} && zpool export furybsd && mdconfig -d -u 0

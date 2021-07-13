@@ -13,14 +13,14 @@ xf86-video-cirrus
 xf86-video-scfb
 xf86-video-vesa
 xf86-video-vmware
-xf86-video-qxl
+# xf86-video-qxl -> DEPRECATED: uses deprecated version of python
 libva-intel-driver
 drm-kmod
 nvidia-driver
 mesa-libs
 mesa-dri
 open-vm-tools
-# virtualbox-ose-additions
+# virtualbox-ose-additions -> broken port in HBSD
 xauth
 xinit
 setxkbmap
