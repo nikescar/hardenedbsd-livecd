@@ -201,13 +201,9 @@ fi
 # https://github.com/furybsd/furybsd-livecd/issues/190
 # Until we have a better solution, hardcode it here too...
 cat >> "${FSMNT}/boot/loader.conf" <<\EOF
-# cp /boot/loader.conf ${FSMNT}/boot
-# Decrease boot verbosity, show splash
-# and fix resolution setting for Intel
-boot_mute="YES"
-beastie_disable="YES"
-autoboot_delay=0
+autoboot_delay=5
 EOF
+# cp /boot/loader.conf ${FSMNT}/boot
 
 # Cleanup
 # umount -f "${FSMNT}/dev" >/dev/null 2>/dev/null || true # Is this needed? TODO: Re-enable if yes
