@@ -4,7 +4,6 @@
 set -e
 
 version="13-stable"
-pkgset="branches/2020Q1" # TODO: Use it
 desktop=$1
 cwd=$(realpath | sed 's|/scripts||g')
 workdir="/usr/local"
@@ -212,14 +211,14 @@ pkg()
 uzip() 
 {
   install -o root -g wheel -m 755 -d "${cdroot}"
-  cd ${cwd} && zpool export furybsd && while zpool status furybsd >/dev/null; do :; done 2>/dev/null
+  cd "${cwd}" && zpool export furybsd && while zpool status furybsd >/dev/null; do :; done 2>/dev/null
   mkuzip -S -d -o "${cdroot}/data/system.uzip" "${livecd}/pool.img"
 }
 
 ramdisk() 
 {
   cp -R "${cwd}/overlays/ramdisk/" "${ramdisk_root}"
-  cd ${cwd} && zpool import furybsd && zfs set mountpoint=/usr/local/furybsd/uzip furybsd 
+  cd "${cwd}" && zpool import furybsd && zfs set mountpoint=/usr/local/furybsd/uzip furybsd
   cd "${uzip}" && tar -cf - rescue | tar -xf - -C "${ramdisk_root}"
   touch "${ramdisk_root}/etc/fstab"
   cp ${uzip}/etc/login.conf ${ramdisk_root}/etc/login.conf
@@ -236,7 +235,7 @@ boot()
   for kfile in kernel geom_uzip.ko cryptodev.ko tmpfs.ko xz.ko zfs.ko; do
   tar -cf - boot/kernel/${kfile} boot/kernel-fbsd/${kfile} | tar -xf - -C "${cdroot}"
   done
-  cd ${cwd} && zpool export furybsd && mdconfig -d -u 0
+  cd "${cwd}" && zpool export furybsd && mdconfig -d -u 0
 }
 
 image()
