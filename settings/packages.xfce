@@ -5,7 +5,7 @@ xfce4-screenshooter-plugin
 xfce4-places-plugin
 xfce4-xkb-plugin
 lightdm-gtk-greeter
-firefox
 zenity
-totem
+vlc
 qt5-style-plugins
+networkmgr
