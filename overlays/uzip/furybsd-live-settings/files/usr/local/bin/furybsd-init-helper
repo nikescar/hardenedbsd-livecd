@@ -81,6 +81,5 @@ fi
 /usr/sbin/sysrc -f /etc/rc.conf kld_list+="cuse ig4 iicbus" >/dev/null 2>/dev/null
 /usr/sbin/sysrc -f /etc/rc.conf allscreens_kbdflags="-b quiet.off" >/dev/null 2>/dev/null
 /usr/sbin/sysrc -f /etc/rc.conf ifconfig_DEFAULT="DHCP inet6 accept_rtadv" >/dev/null 2>/dev/null
-/usr/sbin/sysrc -f /etc/rc.conf avahi_daemon_enable="YES" >/dev/null 2>/dev/null
 /usr/sbin/sysrc -f /etc/rc.conf ntpd_enable="NO" >/dev/null 2>/dev/null # Seems to conflict with ntpdate
 /usr/sbin/sysrc -f /etc/rc.conf ntpdate_enable="YES" >/dev/null 2>/dev/null
