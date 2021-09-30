@@ -1,5 +1,7 @@
 LiveCD builder for HardenedBSD
 
+![alt text](hardenedbsd-livecd.png)
+
 ## System Requirements for building LiveCD
 
 * 2 GHz dual core processor
