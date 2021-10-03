@@ -81,7 +81,7 @@ workspace()
   gpart add -t freebsd-zfs md0
   zpool create furybsd /dev/md0p1
   zfs set mountpoint="${uzip}" furybsd
-  zfs set compression=gzip-6 furybsd
+  zfs set compression=zstd-9 furybsd
 }
 
 base()
@@ -212,7 +212,7 @@ uzip()
 {
   install -o root -g wheel -m 755 -d "${cdroot}"
   cd "${cwd}" && zpool export furybsd && while zpool status furybsd >/dev/null; do :; done 2>/dev/null
-  mkuzip -S -d -o "${cdroot}/data/system.uzip" "${livecd}/pool.img"
+  mkuzip -A zstd -S -d -o "${cdroot}/data/system.uzip" "${livecd}/pool.img"
 }
 
 ramdisk() 

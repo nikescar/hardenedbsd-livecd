@@ -47,7 +47,7 @@ mdconfig -a -t swap -s 3g -u 2 >/dev/null 2>/dev/null
 gpart create -s GPT md2 >/dev/null 2>/dev/null
 gpart add -t freebsd-zfs md2 >/dev/null 2>/dev/null
 zpool create livecd /dev/md2p1 >/dev/null 2>/dev/null
-zfs set compression=gzip livecd 
+zfs set compression=zstd-6 livecd
 zfs set primarycache=none livecd
 
 echo "==> Replicate system image to swap-based memdisk"
