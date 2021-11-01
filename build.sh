@@ -3,7 +3,7 @@
 # Exit on errors
 set -e
 
-version="13-stable"
+version="current"
 desktop=$1
 cwd=$(realpath | sed 's|/scripts||g')
 workdir="/usr/local"
@@ -98,7 +98,7 @@ base()
   fi
   if [ ! -f "${base}/kernel-fbsd.txz" ] ; then
     cd ${base}
-    fetch -v https://download.freebsd.org/ftp/snapshots/amd64/13.0-STABLE/kernel.txz -o kernel-fbsd.txz
+    fetch -v https://download.freebsd.org/ftp/snapshots/amd64/14.0-CURRENT/kernel.txz -o kernel-fbsd.txz
   fi
   cd ${base}
   tar -zxvf base.txz -C ${uzip}

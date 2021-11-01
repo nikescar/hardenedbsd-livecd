@@ -201,6 +201,8 @@ fi
 # https://github.com/furybsd/furybsd-livecd/issues/190
 # Until we have a better solution, hardcode it here too...
 cat >> "${FSMNT}/boot/loader.conf" <<\EOF
+kern.vt.color.0.rgb="#000033"
+kern.vt.color.15.rgb="#ffffff"
 autoboot_delay=5
 EOF
 # cp /boot/loader.conf ${FSMNT}/boot
