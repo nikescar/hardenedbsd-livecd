@@ -24,7 +24,7 @@ done
 echo "==> Mount cdrom"
 mount_cd9660 /dev/iso9660/HARDENEDBSD /cdrom
 mdconfig -f /cdrom/data/system.uzip -u 1
-zpool import furybsd -o readonly=on
+zpool import -f furybsd -o readonly=on
 
 if [ "$SINGLE_USER" = "true" ]; then
         echo "Starting interactive shell in temporary rootfs ..."
