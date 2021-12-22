@@ -47,11 +47,7 @@ if [ "$1" = "-b" ]; then
     mkdir efi
     mount -t msdosfs /dev/$device efi
     mkdir -p efi/efi/boot
-    if [ "${arch}" = "i386" ] ; then
-      cp -p "$BASEBITSDIR/boot/loader.efi" efi/efi/boot/bootia32.efi
-    else
-      cp -p "$BASEBITSDIR/boot/loader.efi" efi/efi/boot/bootx64.efi
-    fi
+    cp -p "$BASEBITSDIR/boot/loader.efi" efi/efi/boot/bootx64.efi
     umount efi
     rmdir efi
     mdconfig -d -u $device

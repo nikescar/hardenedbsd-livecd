@@ -4,7 +4,6 @@
 set -e
 
 version="12-stable"
-pkgset="branches/2020Q1" # TODO: Use it
 desktop=$1
 cwd=$(realpath | sed 's|/scripts||g')
 workdir="/usr/local"
