@@ -97,7 +97,7 @@ class InstallWizard(QtWidgets.QWizard, object):
         # TODO: Make sure it is actually executable
 
         self.should_show_last_page = False
-        self.error_message_nice = "An unknown error occured."
+        self.error_message_nice = "An unknown error occurred."
 
         self.setWizardStyle(QtWidgets.QWizard.MacStyle)
         self.setPixmap(QtWidgets.QWizard.BackgroundPixmap, QtGui.QPixmap(os.path.dirname(__file__) + '/bgusb.png'))
@@ -430,7 +430,7 @@ class InstallationPage(QtWidgets.QWizardPage, object):
         try:
             urllib.request.urlretrieve(wizard.selected_iso_url, self.save_loc, self.handleProgress)
         except:
-            wizard.showErrorPage("An error occured while trying to write the image. Were all partitions unmounted? Do you have write permissions there?")
+            wizard.showErrorPage("An error occurred while trying to write the image. Were all partitions unmounted? Do you have write permissions there?")
 
         wizard.next()
 
