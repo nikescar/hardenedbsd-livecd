@@ -4,8 +4,12 @@ xfce4-pulseaudio-plugin
 xfce4-screenshooter-plugin
 xfce4-places-plugin
 xfce4-xkb-plugin
+# xfce4-goodies -> To be considered
 lightdm-gtk-greeter
 zenity
 vlc
 qt5-style-plugins
 networkmgr
+atril
+ristretto
+engrampa
