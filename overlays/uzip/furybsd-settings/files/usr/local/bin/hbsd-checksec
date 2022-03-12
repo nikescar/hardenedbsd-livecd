@@ -1,0 +1,1133 @@
+#!/usr/bin/env bash
+#
+# The BSD License (http://www.opensource.org/licenses/bsd-license.php)
+# specifies the terms and conditions of use for hbsd-checksec:
+#
+# Copyright (c) 2021, Loic <loic.f@hardenedbsd.org>
+# Copyright (c) 2014-2020, Brian Davis
+# Copyright (c) 2013, Robin David
+# Copyright (c) 2009-2011, Tobias Klein
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# * Redistributions of source code must retain the above copyright
+#   notice, this list of conditions and the following disclaimer.
+# * Redistributions in binary form must reproduce the above copyright
+#   notice, this list of conditions and the following disclaimer in
+#   the documentation and/or other materials provided with the
+#   distribution.
+# * Neither the name of Tobias Klein nor the name of trapkit.de may be
+#   used to endorse or promote products derived from this software
+#   without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+# COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+# OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+# AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+# THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+# DAMAGE.
+#
+# --- Modified Version ---
+# Name    : checksec.sh
+# Version : 1.7.0
+# Author  : Brian Davis
+# Date    : Feburary 2014
+# Download: https://github.com/slimm609/checksec.sh
+#
+# --- Modified Version ---
+# Name    : checksec.sh
+# Version : based on 1.5
+# Author  : Robin David
+# Date    : October 2013
+# Download: https://github.com/RobinDavid/checksec
+#
+# --- Original version ---
+# Name    : checksec.sh
+# Version : 1.5
+# Author  : Tobias Klein
+# Date    : November 2011
+# Download: http://www.trapkit.de/tools/checksec.html
+# Changes : http://www.trapkit.de/tools/checksec_changes.txt
+
+#set global lang to C
+export LC_ALL="C"
+
+# global vars
+debug=false
+verbose=false
+format="cli"
+commandsmissing=false
+OPT=0
+extended_checks=true
+# FORTIFY_SOURCE vars
+FS_end=_chk
+FS_cnt_total=0
+FS_cnt_checked=0
+FS_cnt_unchecked=0
+FS_chk_func_libc=0
+FS_functions=0
+FS_libc=0
+
+# check for required files and deps first
+# check if command exists
+command_exists () {
+  type "${1}"  > /dev/null 2>&1;
+}
+
+if [ $(id -u) != 0 ]; then
+    export PATH=${PATH}:/sbin/:/usr/sbin/
+fi
+
+for command in cat awk sed sysctl uname mktemp openssl grep stat file find sort head ps readlink basename id which xargs; do
+    if ! (command_exists ${command}); then
+       >&2 echo -e "\e[31mWARNING: '${command}' not found! It's required for most checks.\e[0m"
+       commandsmissing=true
+    fi
+done
+
+if [ ${commandsmissing} == true ]; then
+    >&2 echo -e "\n\e[31mWARNING: Not all necessary commands found. Some tests might not work!\e[0m\n"
+    sleep 2
+fi
+
+if (command_exists readelf); then
+     readelf="readelf -W"
+elif (command_exists eu-readelf); then
+     readelf="eu-readelf -W"
+elif (command_exists greadelf); then
+     readelf="greadelf -W"
+else
+    echo -e "\n\e[31mERROR: readelf is a required tool for almost all tests. Aborting...\e[0m\n"
+    exit
+fi
+
+sysarch=$(uname -m)
+if [ "${sysarch}" == "amd64" ]; then
+    arch="64"
+elif [ "${sysarch}" == "i?86" ]; then
+    arch="32"
+elif [ "${sysarch}" =~ "arm" ]; then
+    arch="arm"
+elif [ "${sysarch}" =~ "aarch64" ]; then
+    arch="aarch64"
+fi
+
+# version information
+version() {
+  echo "hbsd-checksec, Loic <loic.f@hardenedbsd.org>"
+  echo "Based off checksec v2.4.0, Brian Davis, github.com/slimm609/checksec.sh, Dec 2015"
+  echo "Based off checksec v1.5, Tobias Klein, www.trapkit.de, November 2011"
+  echo
+}
+
+# help
+help() {
+  echo "Usage: hbsd-checksec [--format={cli,csv,xml,json}] [OPTION]"
+  echo
+  echo
+  echo "Options:"
+  echo
+  echo " ## hbsd-checksec Options"
+  echo "  --file={file}"
+  echo "  --dir={directory}"
+  echo "  --listfile={text file with one file per line}"
+  echo "  --proc={process name}"
+  echo "  --proc-all"
+  echo "  --proc-libs={process ID}"
+  echo "  --kernel"
+  echo "  --version"
+  echo "  --help"
+  echo
+  echo " ## Modifiers"
+  echo "  --debug"
+  echo "  --verbose"
+  echo "  --format={cli,csv,xml,json}"
+  echo "  --output={cli,csv,xml,json}"
+  echo "  --no-extended"
+  echo
+}
+
+# format
+format () {
+  list="cli csv xml json"
+  if [ -n "${output_format}" ]; then
+    if [[ ! ${list} =~ ${output_format} ]]; then
+  printf "\033[31mError: Please provide a valid format {cli, csv, xml, json}.\033[m\n\n"
+  exit 1
+    fi
+  fi
+  if [ "${output_format}" == "xml" ]; then
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+  fi
+  format="${output_format}"
+}
+
+#run help if nothing is passed
+if [ $# -lt 1 ]; then
+  help
+  exit 1
+fi
+
+echo_message() {
+  if [ ${format} == "csv" ]; then
+      echo -n -e "$2"
+  elif [ ${format} == "xml" ]; then
+      echo -n -e "$3"
+  elif [ ${format} == "json" ]; then
+      echo -n -e "$4"
+  else #default to cli
+      echo -n -e "${1}"
+  fi
+}
+
+# check if directory exists
+dir_exists () {
+  ${debug} && echo "fuction dir_exists"
+  if [ -d "${1}" ] ; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# check user privileges
+root_privs () {
+ ${debug} && echo "***function root_privs"
+  if [ $(/usr/bin/id -u) -eq 0 ] ; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# check procfs
+check_procfs () {
+ ${debug} && echo "***function check_procfs"
+  if [[ $(mount | grep procfs; echo $?) == 1 ]]; then
+    mount -t procfs proc /proc 2>/dev/null || echo "ERROR: please mount /proc File System or run this tool as root."
+	if [ "$(id -u)" -ne "0" ]; then
+		exit 1
+	fi
+  fi
+}
+
+# check if input is numeric
+isNumeric () {
+  ${debug} && echo "***function isNumeric"
+  echo "$@" | grep -q -v "[^0-9]"
+}
+
+# check if input is a string
+isString () {
+  ${debug} && echo "***function isString"
+  echo "$@" | grep -q -v "[^ A-Z_a-z]"
+}
+
+# check file(s)
+filecheck() {
+  ${debug} && echo "***function filecheck"
+  # check for RELRO support
+  ${debug} && echo "***function filecheck->RELRO"
+  if ${readelf} -l "${1}" 2>/dev/null | grep -q 'GNU_RELRO'; then
+    if ${readelf} -d "${1}" 2>/dev/null | grep -q 'BIND_NOW'; then
+      echo_message '\033[32mFull RELRO   \033[m   ' 'Full RELRO,' '<file relro="full"' " \"${1}\": { \"relro\":\"full\","
+    else
+      echo_message '\033[33mPartial RELRO\033[m   ' 'Partial RELRO,' '<file relro="partial"' " \"${1}\": { \"relro\":\"partial\","
+    fi
+  else
+    echo_message '\033[31mNo RELRO     \033[m   ' 'No RELRO,' '<file relro="no"' " \"${1}\": { \"relro\":\"no\","
+  fi
+
+  # check for stack canary support
+  ${debug} && echo -e "\n***function filecheck->canary"
+  if ${readelf} -s "${1}" 2>/dev/null | grep -Eq '__stack_chk_fail|__intel_security_cookie'; then
+    echo_message '\033[32mCanary found   \033[m   ' 'Canary found,' ' canary="yes"' '"canary":"yes",'
+  else
+    echo_message '\033[31mNo canary found\033[m   ' 'No Canary found,' ' canary="no"' '"canary":"no",'
+  fi
+
+  # check for NX support
+  ${debug} && echo -e "\n***function filecheck->nx"
+  if ${readelf} -l "${1}" 2>/dev/null | grep -q 'GNU_STACK'; then
+    if ${readelf} -l "${1}" 2>/dev/null | grep 'GNU_STACK' | grep -q 'RWE'; then
+      echo_message '\033[31mNX disabled\033[m   ' 'NX disabled,' ' nx="no"' '"nx":"no",'
+    else
+      echo_message '\033[32mNX enabled \033[m   ' 'NX enabled,' ' nx="yes"' '"nx":"yes",'
+    fi
+  else
+    echo_message '\033[31mNX disabled\033[m   ' 'NX disabled,' ' nx="no"' '"nx":"no",'
+  fi
+
+  # check for PIE support
+  ${debug} && echo -e "\n***function filecheck->pie"
+  if ${readelf} -h "${1}" 2>/dev/null | grep -q 'Type:[[:space:]]*EXEC'; then
+    echo_message '\033[31mNo PIE       \033[m   ' 'No PIE,' ' pie="no"' '"pie":"no",'
+  elif ${readelf} -h "${1}" 2>/dev/null | grep -q 'Type:[[:space:]]*DYN'; then
+    if ${readelf} -d "${1}" 2>/dev/null | grep -q 'DEBUG'; then
+      echo_message '\033[32mPIE enabled  \033[m   ' 'PIE enabled,' ' pie="yes"' '"pie":"yes",'
+    else
+      echo_message '\033[33mDSO          \033[m   ' 'DSO,' ' pie="dso"' '"pie":"dso",'
+    fi
+  elif ${readelf} -h "${1}" 2>/dev/null | grep -q 'Type:[[:space:]]*REL'; then
+    echo_message '\033[33mREL          \033[m   ' 'REL,' ' pie="rel"' '"pie":"rel",'
+  else
+    echo_message '\033[33mNot an ELF file\033[m   ' 'Not an ELF file,' ' pie="not_elf"' '"pie":"not_elf",'
+  fi
+
+  if ${extended_checks}; then
+    # check if compiled with Clang CFI
+    ${debug} && echo -e "\n***function filecheck->clangcfi"
+    #if $readelf -s "$1" 2>/dev/null | grep -Eq '\.cfi'; then
+    read -r cfifunc <<< "$($readelf -s "${1}" 2>/dev/null | grep .cfi | awk '{ print $8 }')"
+    func=${cfifunc/.cfi/}
+    if [ -n "$cfifunc" ] && $readelf -s "$1" 2>/dev/null | grep -q "$func$"; then
+      echo_message '\033[32mClang CFI found   \033[m   ' 'with CFI,' ' clangcfi="yes"' '"clangcfi":"yes",'
+    else
+      echo_message '\033[31mNo Clang CFI found\033[m   ' 'without CFI,' ' clangcfi="no"' '"clangcfi":"no",'
+    fi
+
+    # check if compiled with Clang SafeStack
+    ${debug} && echo -e "\n***function filecheck->safestack"
+    if $readelf -s "$1" 2>/dev/null | grep -Eq '__safestack_init'; then
+      echo_message '\033[32mSafeStack found   \033[m   ' 'with SafeStack,' ' safestack="yes"' '"safestack":"yes",'
+    else
+      echo_message '\033[31mNo SafeStack found\033[m   ' 'without SafeStack,' ' safestack="no"' '"safestack":"no",'
+    fi
+  fi
+
+  # check for rpath / run path
+  ${debug} && echo -e "\n***function filecheck->rpath"
+  # search for a line that matches RPATH and extract the colon-separated path list within brackets
+  # example input: "0x000000000000000f (RPATH) Library rpath: [/lib/systemd:/lib/apparmor]"
+  IFS=: read -r -a rpath_array <<< "$(${readelf} -d "${1}" 2>/dev/null | awk -F'[][]' '/RPATH/ {print $2}')"
+  if [ "${#rpath_array[@]}" -gt 0 ]; then
+    if xargs stat -c %A <<< "${rpath_array[*]}" 2>/dev/null | grep -q 'rw'; then
+      echo_message '\033[31mRW-RPATH \033[m  ' 'RPATH,' ' rpath="yes"' '"rpath":"yes",'
+    else
+      echo_message '\033[31mRPATH   \033[m  ' 'RPATH,' ' rpath="yes"' '"rpath":"yes",'
+    fi
+  else
+    echo_message '\033[32mNo RPATH \033[m  ' 'No RPATH,' ' rpath="no"' '"rpath":"no",'
+  fi
+
+  ${debug} && echo -e "\n***function filecheck->runpath"
+  # search for a line that matches RUNPATH and extract the colon-separated path list within brackets
+  IFS=: read -r -a runpath_array <<< "$(${readelf} -d "${1}" 2>/dev/null | awk -F'[][]' '/RUNPATH/ {print $2}')"
+  if [ "${#runpath_array[@]}" -gt 0 ]; then
+    if xargs stat -c %A <<< "${runpath_array[*]}" 2>/dev/null | grep -q 'rw'; then
+      echo_message '\033[31mRW-RUNPATH \033[m  ' 'RUNPATH,' ' runpath="yes"' '"runpath":"yes",'
+    else
+      echo_message '\033[31mRUNPATH   \033[m  ' 'RUNPATH,' ' runpath="yes"' '"runpath":"yes",'
+    fi
+  else
+   echo_message '\033[32mNo RUNPATH \033[m  ' 'No RUNPATH,' ' runpath="no"' '"runpath":"no",'
+  fi
+
+  # check for stripped symbols in the binary
+  IFS=" " read -r -a SYM_cnt <<< "$(${readelf} --symbols "${1}" 2>/dev/null | grep '\.symtab' | cut -d' ' -f5 | cut -d: -f1))"
+  if ${readelf} --symbols "${1}" 2>/dev/null | grep -q '\.symtab'; then
+    echo_message "\033[31m${SYM_cnt[0]} Symbols\t\033[m  " 'Symbols,' ' symbols="yes"' '"symbols":"yes",'
+  else
+    echo_message '\033[32mNo Symbols\t\033[m  ' 'No Symbols,' ' symbols="no"' '"symbols":"no",'
+  fi
+}
+
+# check process(es)
+proccheck() {
+  ${debug} && echo -e "\n***function proccheck"
+  # check for RELRO support
+  ${debug} && echo "***function proccheck->RELRO"
+  if ${readelf} -l "${1}/file" 2>/dev/null | grep -q 'Program Headers'; then
+    if ${readelf} -l "${1}/file" 2>/dev/null | grep -q 'GNU_RELRO'; then
+      if ${readelf} -d "${1}/file" 2>/dev/null | grep -q 'BIND_NOW'; then
+  echo_message '\033[32mFull RELRO   \033[m   ' 'Full RELRO,' ' relro="full"' '"relro":"full",'
+      else
+  echo_message '\033[33mPartial RELRO\033[m   ' 'Partial RELRO,' ' relro="partial"' '"relro":"partial",'
+      fi
+    else
+      echo_message '\033[31mNo RELRO     \033[m   ' 'No RELRO,' ' relro="no"' '"relro":"no",'
+    fi
+  else
+    echo -n -e '\033[31mPermission denied (please run as root)\033[m\n'
+    exit 1
+  fi
+
+  # check for stack canary support
+  ${debug} && echo -e "\n***function proccheck->canary"
+  if ${readelf} -s "${1}/file" 2>/dev/null | grep -q 'Symbol table'; then
+    if ${readelf} -s "${1}/file" 2>/dev/null | grep -Eq '__stack_chk_fail|__intel_security_cookie'; then
+      echo_message '\033[32mCanary found         \033[m   ' 'Canary found,' ' canary="yes"' '"canary":"yes",'
+    else
+      echo_message '\033[31mNo canary found      \033[m   ' 'No Canary found,' ' canary="no"' '"canary":"no",'
+    fi
+  else
+    if [ "${1}" == "1" ] ; then
+      echo_message '\033[33mPermission denied    \033[m   ' 'Permission denied,' ' canary="Permission denied"' '"canary":"Permission denied",'
+    else
+      echo_message '\033[33mNo symbol table found \033[m  ' 'No symbol table found,' ' canary="No symbol table found"' '"canary":"No symbol table found",'
+    fi
+  fi
+
+  if ${extended_checks}; then
+    # check if compiled with Clang CFI
+    $debug && echo -e "\n***function proccheck->clangcfi"
+    #if $readelf -s "$1" 2>/dev/null | grep -Eq '\.cfi'; then
+    read -r -a cfifunc <<< "$($readelf -s "$1/file" 2>/dev/null | grep .cfi | awk '{ print $8 }')"
+    func=${cfifunc/.cfi/}
+    # TODO: fix this check properly, need more clang CFI files to be able to test properly
+    # shellcheck disable=SC2128
+    if [ -n "$cfifunc" ] && $readelf -s "$1/file" 2>/dev/null | grep -q "$func$"; then
+      echo_message '\033[32mClang CFI found   \033[m   ' 'with CFI,' ' clangcfi="yes"' '"clangcfi":"yes",'
+    else
+      echo_message '\033[31mNo Clang CFI found\033[m   ' 'without CFI,' ' clangcfi="no"' '"clangcfi":"no",'
+    fi
+
+    # check if compiled with Clang SafeStack
+    $debug && echo -e "\n***function proccheck->safestack"
+    if $readelf -s "$1/file" 2>/dev/null | grep -Eq '__safestack_init'; then
+      echo_message '\033[32mSafeStack found   \033[m   ' 'with SafeStack,' ' safestack="yes"' '"safestack":"yes",'
+    else
+      echo_message '\033[31mNo SafeStack found\033[m   ' 'without SafeStack,' ' safestack="no"' '"safestack":"no",'
+    fi
+  fi
+
+  # check for BIND_NOW
+  ${debug} && echo -e "\n***function proccheck->BIND_NOW"
+    if $readelf -dW "$1/file" 2>/dev/null | grep -Eq 'BIND_NOW'; then
+      echo_message '\033[32mBIND_NOW found   \033[m   ' 'with BIND_NOW,' ' BIND_NOW="yes"' '"BIND_NOW":"yes",'
+    else
+      echo_message '\033[31mNo BIND_NOW found\033[m   ' 'without BIND_NOW,' ' BIND_NOW="no"' '"BIND_NOW":"no",'
+    fi
+
+  # Check for NX support
+  ${debug} && echo -e "\n***function proccheck->NX"
+  if ${readelf} -l "${1}/file" 2>/dev/null | grep 'GNU_STACK' | grep -q 'RWE'; then
+    echo_message '\033[31mNX disabled\033[m   ' 'NX disabled,' ' nx="no"' '"nx":"no",'
+  else
+    echo_message '\033[32mNX enabled \033[m   ' 'NX enabled,' ' nx="yes"' '"nx":"yes",'
+  fi
+
+  # check for PIE support
+  ${debug} && echo -e "\n***function proccheck->PIE"
+  if ${readelf} -h "${1}/file" 2>/dev/null | grep -q 'Type:[[:space:]]*EXEC'; then
+    echo_message '\033[31mNo PIE               \033[m   ' 'No PIE,' ' pie="no"' '"pie":"no",'
+  elif ${readelf} -h "${1}/file" 2>/dev/null | grep -q 'Type:[[:space:]]*DYN'; then
+    if ${readelf} -d "${1}/file" 2>/dev/null | grep -q 'DEBUG'; then
+      echo_message '\033[32mPIE enabled          \033[m   ' 'PIE enabled,' ' pie="yes"' '"pie":"yes",'
+    else
+      echo_message '\033[33mDynamic Shared Object\033[m   ' 'Dynamic Shared Object,' ' pie="dso"' '"pie":"dso",'
+    fi
+  else
+    echo_message '\033[33mNot an ELF file      \033[m   ' 'Not an ELF file,' ' pie="not_elf"' '"pie":"not_elf",'
+  fi
+
+  #check for forifty source support
+#FIX-ME
+#  FS_functions="$(${readelf} -s "${1}/file" 2>/dev/null | awk '{ print $8 }' | sed 's/_*//' | sed -e 's/@.*//')"
+#  if grep -q '_chk$' <<<"$FS_functions"; then
+#    echo_message '\033[32mYes\033[m' 'Yes' " fortify_source='yes'>" '"fortify_source":"yes" }'
+#  else
+#    echo_message "\033[31mNo\033[m" "No" " fortify_source='no'>" '"fortify_source":"no" }'
+#  fi
+}
+
+# check mapped libraries
+libcheck() {
+  ${debug} && echo "***function libcheck"
+  IFS=" " read -r -a libs <<< "$(awk '{ print $6 }' "/proc/${1}/map" | grep '/' | sort -u | xargs file | grep ELF | awk '{ print $1 }' | sed 's/:/ /')"
+  echo_message "\n* Loaded libraries (file information, # of mapped files: ${#libs[@]}):\n\n" "" "" "\"libs\": {"
+
+  for ((element=0; element<${#libs[@]}; element++))
+  do
+    echo_message "  ${libs[$element]}:\n" "${libs[$element]}," "" ""
+    echo_message "    " "" "    " ""
+    filecheck "${libs[$element]}"
+    if [ ${element} == $((${#libs[@]} - 1)) ]; then
+      echo_message "\n\n" "\n" " filename='${libs[$element]}' />\n" ""
+    else
+      echo_message "\n\n" "\n" " filename='${libs[$element]}' />\n" "},"
+    fi
+  done
+}
+
+# check for system-wide ASLR support
+aslrcheck() {
+  ${debug} && echo "***function aslrcheck"
+  # PaX ASLR support
+  ${debug} && echo -e "\n***function aslrcheck->PAX ASLR"
+  aslrstatus_check=$(sysctl -n hardening.pax.aslr.status 2>/dev/null)
+  if [ "$aslrstatus_check" = 2 ]; then
+    echo_message '\033[32mPaX ASLR enabled\033[m\n\n' '' '' ''
+  else
+    echo_message '\033[31mPaX ASLR disabled\033[m\n\n' '' '' ''
+  fi
+}
+
+# check cpu nx flag
+nxcheck() {
+  ${debug} && echo -e "\n***function nxcheck"
+  if ! (grep -qFw NX /var/run/dmesg.boot 2> /dev/null); then
+    echo_message '\033[33m insufficient privileges for NX checks\033[m\n' '' '' ''
+  fi
+  if (grep -qFw NX /var/run/dmesg.boot 2> /dev/null); then
+    echo_message '\033[32mYes\033[m\n\n' '' '' ''
+  else
+    echo_message '\033[31mNo\033[m\n\n' '' '' ''
+  fi
+}
+
+#Check core dumps restricted?
+coredumpcheck() {
+        ${debug} && echo -e "\n***function coredumpcheck"
+ 		if grep -q 'dumpdev="NO"' /etc/rc.conf 2> /dev/null; then
+                echo_message '\033[32mRestricted\033[m\n\n' '' '' ''
+        else
+                echo_message '\033[31mNot Restricted\033[m\n\n' '' '' ''
+        fi
+}
+
+# check for kernel protection mechanisms
+kernelcheck() {
+  ${debug} && echo "***function kernelcheck"
+  echo_message "  Description - List the status of kernel protection mechanisms. Rather than\n" '' '' ''
+  echo_message "  inspect kernel mechanisms that may aid in the prevention of exploitation of\n" '' '' ''
+  echo_message "  userspace processes, this option lists the status of kernel configuration\n" '' '' ''
+  echo_message "  options that harden the kernel itself against attack.\n\n" '' '' ''
+
+  echo_message "  HardenedBSD ASLR:\t\t\t\t  " "" "" ""
+  randomize_va=$(sysctl -n hardening.pax.aslr.status)
+  if [ "x${randomize_va}" == "x2" ]; then
+    echo_message "\033[32mFull\033[m\n" "Full," " randomize_va_space='full'" ', "randomize_va_space":"full"'
+  elif [ "x${randomize_va}" == "x1" ]; then
+    echo_message "\033[33mPartial\033[m\n" "Partial," " randomize_va_space='partial'" ', "randomize_va_space":"partial"'
+  else
+    echo_message "\033[31mNone\033[m\n" "None," " randomize_va_space='none'" ', "randomize_va_space":"none"'
+  fi
+
+    if  [ "0" -eq "0" ]; then
+      echo_message "\n  HardenedBSD sysctl options:\n" "" "" ', "hardening_sysctl": {'
+      for command in vm.pmap.pti kern.randompid security.bsd.hardlink_check_uid hw.kbd.keymap_restrict_change kern.msgbuf_show_timestamp net.inet.ip.random_id net.inet.ip.check_interface  net.inet6.ip6.use_tempaddr net.inet6.ip6.prefer_tempaddr security.bsd.hardlink_check_gid security.bsd.stack_guard_page kern.features.hbsd_hardening hardening.procfs_harden hardening.log.ulog hardening.log.log hardening.control.extattr.status hardening.control.acl.status hardening.pax.segvguard.max_crashes hardening.pax.segvguard.suspend_timeout hardening.pax.segvguard.expiry_timeout hardening.pax.segvguard.status hardening.pax.mprotect.status hardening.pax.pageexec.status hardening.pax.disallow_map32bit.status hardening.pax.aslr.status security.jail.param.hardening.log.ulog security.jail.param.hardening.log.log security.jail.param.hardening.pax.segvguard.status security.jail.param.hardening.pax.mprotect.status security.jail.param.hardening.pax.pageexec.status security.jail.param.hardening.pax.disallow_map32bit.status security.jail.param.hardening.pax.aslr.status kern.features.secadm kern.features.integriforce; do
+        echo_message "    ${command} = " "" "" ""
+        hardeningcheck=$(sysctl -n ${command} 2>/dev/null)
+        if [ "0${hardeningcheck}" -ge 1 ]; then
+          echo_message "\033[32mOK\033[m\n" "OK," " ${command}='yes'" ", \"${command}\":\"yes\""
+        else
+          echo_message "\033[31mNOK\033[m\n" "NOK," " ${command}='no'" ", \"${command}\":\"no\""
+        fi
+          echo_message "" "" "" ""
+      done
+
+      echo_message "" "" " />\n</kernel>\n" ""
+    fi
+
+    if  [ "0" -eq "0" ]; then
+      # fix-me: hw.intel_sdbg
+      for command in hw.ibrs_active machdep.hyperthreading_allowed net.inet6.ip6.use_deprecated net.inet6.icmp6.rediraccept security.bsd.see_other_uids security.bsd.see_other_gids security.bsd.unprivileged_read_msgbuf security.bsd.unprivileged_proc_debug security.bsd.see_jail_proc; do
+        echo_message "    ${command} = " "" "" ""
+        hardeningcheck2=$(sysctl -n ${command} 2>/dev/null)
+        if [ "0${hardeningcheck2}" -lt 1 ]; then
+          echo_message "\033[32mOK\033[m\n" "OK," " ${command}='yes'" ", \"${command}\":\"yes\""
+        else
+          echo_message "\033[31mNOK\033[m\n" "NOK," " ${command}='no'" ", \"${command}\":\"no\""
+        fi
+          echo_message "" "" "" ""
+      done
+
+      echo_message "" "" " />\n</kernel>\n" ""
+    fi
+}
+
+# --- FORTIFY_SOURCE subfunctions (start) ---
+# is FORTIFY_SOURCE supported by libc?
+FS_libc_check() {
+  ${debug} && echo "***function FS_libc_check"
+  echo_message "* FORTIFY_SOURCE support available (libc)    : " "" ""
+
+  if [ "${#FS_chk_func_libc[@]}" != "0" ] ; then
+    echo_message "\033[32mYes\033[m\n" "Yes," " libc_fortify_source='yes' " ', "libc_fortify_source":"yes"'
+  else
+    echo_message "\033[31mNo\033[m\n" "No," " libc_fortify_source='no' " ', "libc_fortify_source":"no"'
+    exit 1
+  fi
+}
+
+# was the binary compiled with FORTIFY_SOURCE?
+FS_binary_check() {
+  ${debug} && echo "***function FS_binary_check"
+  echo_message "* Binary compiled with FORTIFY_SOURCE support: " "" "" ""
+
+  for ((FS_elem_functions=0; FS_elem_functions<${#FS_functions[@]}; FS_elem_functions++))
+  do
+    if [ ${FS_functions[$FS_elem_functions]} =~ _chk$ ] ; then
+      echo_message "\033[32mYes\033[m\n" "Yes\n" " binary_compiled_with_fortify='yes'>\n" ', "binary_compiled_with_fortify":"yes"'
+      return
+    fi
+  done
+  echo_message "\033[31mNo\033[m\n" "No\n" " binary_compiled_with_fortify='no'>\n" ', "binary_compiled_with_fortify":"no"'
+}
+
+FS_comparison() {
+  ${debug} && echo "***function FS_comparison"
+  echo_message "\n" "" ""
+  echo_message " ------ EXECUTABLE-FILE ------- . -------- LIBC --------\n" "" "" ""
+  echo_message " Fortifiable library functions | Checked function names\n" "" "" ""
+  echo_message " -------------------------------------------------------\n" "" "" ""
+
+  ${debug} && echo -e "\n***function FS_comparison->FS_elem_libc"
+  for ((FS_elem_libc=0; FS_elem_libc<${#FS_chk_func_libc[@]}; FS_elem_libc++))
+  do
+    ${debug} && echo -e "\n***function FS_comparison->FS_elem_libc->FS_elem_functions"
+    for ((FS_elem_functions=0; FS_elem_functions<${#FS_functions[@]}; FS_elem_functions++))
+    do
+      FS_tmp_func=${FS_functions[$FS_elem_functions]}
+      FS_tmp_libc=${FS_chk_func_libc[$FS_elem_libc]}
+
+  if [ ${FS_tmp_func} =~ ^${FS_tmp_libc}$ ] ; then
+    if [ ${format} == "cli" ]; then
+      printf " \033[31m%-30s\033[m | __%s%s\n" "${FS_tmp_func}" "${FS_tmp_libc}" "${FS_end}"
+    else
+      if [ $FS_elem_functions == 0 ]; then
+        echo_message "" "${FS_tmp_func},${FS_tmp_libc},yes\n" "    <function name='${FS_tmp_func}' libc='${FS_tmp_libc}' fortifiable='yes' />\n" ", \"function\": { \"name\":\"${FS_tmp_func}\", \"libc\":\"${FS_tmp_libc}\", \"fortifiable\":\"yes\" }"
+      elif [ $FS_elem_functions == $((${#FS_functions[@]} - 1 )) ]; then
+        echo_message "" "${FS_tmp_func},${FS_tmp_libc},yes\n" "    <function name='${FS_tmp_func}' libc='${FS_tmp_libc}' fortifiable='yes' />\n" ", \"function\": { \"name\":\"${FS_tmp_func}\", \"libc\":\"${FS_tmp_libc}\", \"fortifiable\":\"yes\" }"
+      else
+        echo_message "" "${FS_tmp_func},${FS_tmp_libc},yes\n" "    <function name='${FS_tmp_func}' libc='${FS_tmp_libc}' fortifiable='yes' />\n" ", \"function\": { \"name\":\"${FS_tmp_func}\", \"libc\":\"${FS_tmp_libc}\", \"fortifiable\":\"yes\" }"
+    fi
+  fi
+        (( FS_cnt_total++ ))
+        (( FS_cnt_unchecked++ ))
+   elif [[ ${FS_tmp_func} =~ ^${FS_tmp_libc}(_chk)$ ]] ; then
+     if [ ${format} == "cli" ]; then
+       printf " \033[32m%-30s\033[m | __%s%s\n" "${FS_tmp_func}" "${FS_tmp_libc}" "${FS_end}"
+     else
+      if [ $FS_elem_functions == 0 ]; then
+        echo_message "" "${FS_tmp_func},${FS_tmp_libc},no\n" "    <function name='${FS_tmp_func}' libc='${FS_tmp_libc}' fortifiable='no' />\n" ", \"function\": { \"name\":\"${FS_tmp_func}\", \"libc\":\"${FS_tmp_libc}\", \"fortifiable\":\"no\" }"
+      elif [ $FS_elem_functions == $((${#FS_functions[@]} - 1 )) ]; then
+        echo_message "" "${FS_tmp_func},${FS_tmp_libc},no\n" "    <function name='${FS_tmp_func}' libc='${FS_tmp_libc}' fortifiable='no' />\n" ", \"function\": { \"name\":\"${FS_tmp_func}\", \"libc\":\"${FS_tmp_libc}\", \"fortifiable\":\"no\" }"
+      else
+        echo_message "" "${FS_tmp_func},${FS_tmp_libc},no\n" "    <function name='${FS_tmp_func}' libc='${FS_tmp_libc}' fortifiable='no' />\n" ", \"function\": { \"name\":\"${FS_tmp_func}\", \"libc\":\"${FS_tmp_libc}\", \"fortifiable\":\"no\" }"
+      fi
+  fi
+        (( FS_cnt_total++ ))
+        (( FS_cnt_checked++ ))
+   fi
+
+    done
+  done
+}
+
+FS_summary() {
+  ${debug} && echo "***function FS_summary"
+  echo_message "\n" "" "\n" ""
+  echo_message "SUMMARY:\n\n" "" "" ""
+  echo_message "* Number of checked functions in libc                : ${#FS_chk_func_libc[@]}\n" "${#FS_chk_func_libc[@]}," "    <stats nb_libc_func='${#FS_chk_func_libc[@]}'" ", \"stats\": { \"nb_libc_func\":\"${#FS_chk_func_libc[@]}\""
+  echo_message "* Total number of library functions in the executable: ${#FS_functions[@]}\n" "${#FS_functions[@]}," " nb_total_func='${#FS_functions[@]}'" ", \"nb_total_func\":\"${#FS_functions[@]}\""
+  echo_message "* Number of Fortifiable functions in the executable : ${FS_cnt_total}\n"  "${FS_cnt_total}," " nb_fortifiable_func='${FS_cnt_total}'" ", \"nb_fortifiable_func\":\"${FS_cnt_total}\""
+  echo_message "* Number of checked functions in the executable      : \033[32m${FS_cnt_checked}\033[m\n" "${FS_cnt_checked}," " nb_checked_func='${FS_cnt_checked}'" ", \"nb_checked_func\":\"${FS_cnt_checked}\""
+  echo_message "* Number of unchecked functions in the executable    : \033[31m${FS_cnt_unchecked}\033[m\n" "${FS_cnt_unchecked}" " nb_unchecked_func='${FS_cnt_unchecked}' />" ", \"nb_unchecked_func\":\"${FS_cnt_unchecked}\" } "
+  echo_message "\n" "\n" "\n" ""
+}
+
+debug_report() {
+  echo "***** hbsd-checksec debug *****"
+  failed=false
+  id
+  uname -a
+
+  if [ -f /etc/os-release ]; then
+    # freedesktop.org and systemd
+    # shellcheck disable=SC1091
+    source /etc/os-release
+    # shellcheck disable=SC2153
+    OS=${NAME}
+    VER=${VERSION_ID}
+  elif type lsb_release >/dev/null 2>&1; then
+    # linuxbase.org
+    OS=$(lsb_release -si)
+    VER=$(lsb_release -sr)
+  elif [ -f /etc/lsb-release ]; then
+    # For some versions of Debian/Ubuntu without lsb_release command
+    # shellcheck disable=SC1091
+    source /etc/lsb-release
+    OS=${DISTRIB_ID}
+    VER=${DISTRIB_RELEASE}
+  else
+    # Fall back to uname, e.g. "Linux <version>", also works for BSD, etc.
+    OS=$(uname -s)
+    VER=$(uname -r)
+  fi
+
+  echo "OS=${OS}"
+  echo "VER=${VER}"
+
+  for command in cat awk sysctl uname mktemp openssl grep stat file find head ps readlink basename id which wget curl readelf eu-readelf; do
+    path="$(command -v ${command})"
+    if [ -e "${path}" ]; then
+      ls -l "${path}"
+      if [ -L "${path}" ]; then
+        absolutepath=$(readlink -f "${path}")
+        ls -l "${absolutepath}"
+        file "${absolutepath}"
+      else
+        file "${path}"
+      fi
+    else
+       echo "*** can not find command ${command}"
+       failed=true
+    fi
+  done
+
+  if [ ${failed} ]; then
+    exit 1
+ fi
+}
+
+chk_dir () {
+  if [ -z "${CHK_DIR}" ] ; then
+    printf "\033[31mError: Please provide a valid directory.\033[m\n\n"
+    exit 1
+  fi
+  # remove trailing slashes
+  tempdir=$(echo "${CHK_DIR}" | sed -e "s/\/*$//")
+  if [ ! -d "${tempdir}" ] ; then
+    printf "\033[31mError: The directory '%s' does not exist.\033[m\n\n" "${tempdir}"
+    exit 1
+  fi
+  if ${extended_checks}; then
+    echo_message "RELRO           STACK CANARY      NX            PIE             Clang CFI            SafeStack            RPATH      RUNPATH    Symbols      \tFilename\n" '' "<dir name='$tempdir'>\n" "{ \"dir\": { \"name\":\"$tempdir\" }"
+  else
+    echo_message "RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH    Symbols      \tFilename\n" '' "<dir name='$tempdir'>\n" "{ \"dir\": { \"name\":\"$tempdir\" }"
+  fi
+  fdircount=0
+  fdirtotal=0
+
+  while read -r N; do
+    if [ "${N}" != "[A-Za-z1-0]*" ]; then
+      out=$(file "$(readlink -f "${N}")")
+      if [[ ${out} =~ ELF ]] ; then
+        (( fdirtotal++ ))
+      fi
+    fi
+  done < <(find "${tempdir}" -type f 2>/dev/null)
+  if [ $fdirtotal -gt 0 ]; then 
+    echo_message "" "" "" ","
+  fi
+  while read -r N; do
+    if [ "${N}" != "[A-Za-z1-0]*" ]; then
+  # read permissions?
+  if [ ! -r "${N}" ]; then
+      printf "\033[31mError: No read permissions for '%s' (run as root).\033[m\n" ", ${N}"
+  else
+      # ELF executable?
+      out=$(file "$(readlink -f "${N}")")
+      if [[ ! ${out} =~ ELF ]] ; then
+        if [ "${verbose}" = "true" ] ; then
+            echo_message "\033[34m*** Not an ELF file: ${tempdir}/" "" "" ""
+              file "${N}"
+            echo_message "\033[m" "" "" ""
+        fi
+      else
+          (( fdircount++ ))
+        echo_message "" "" "    " ""
+        filecheck "${N}"
+        if [ "$(find "${N}" \( -perm -004000 -o -perm -002000 \) -type f -print)" ]; then
+            echo_message "\033[37;41m${N}\033[m\n" ",${N}\n" " filename='${N}' />\n" ", \"filename\":\"${N}\"}"
+        else
+            echo_message "${N}\n" ",${N}\n" " filename='${N}' />\n" ", \"filename\":\"${N}\"}"
+        fi
+        if [ "${fdircount}" == "${fdirtotal}" ]; then
+        echo_message "" "" "" ""
+      else
+        echo_message "" "" "" ","
+        fi
+      fi
+  fi
+    fi
+  done < <(find "${tempdir}" -type f 2>/dev/null)
+  echo_message "" "" "</dir>\n" "}"
+}
+
+chk_file () {
+  if [ -z "${CHK_FILE}" ] ; then
+    printf "\033[31mError: Please provide a valid file.\033[m\n\n"
+  exit 1
+  fi
+
+  # does the file exist?
+  if [ ! -e "${CHK_FILE}" ] ; then
+    printf "\033[31mError: The file '%s' does not exist.\033[m\n\n" "${CHK_FILE}"
+    exit 1
+  fi
+
+  # read permissions?
+  if [ ! -r "${CHK_FILE}" ] ; then
+    printf "\033[31mError: No read permissions for '%s' (run as root).\033[m\n\n" "${CHK_FILE}"
+    exit 1
+  fi
+
+  # ELF executable?
+  out=$(file "$(readlink -f "${CHK_FILE}")")
+  if [ ! ${out} =~ ELF ] ; then
+    printf "\033[31mError: Not an ELF file: "
+    file "${CHK_FILE}"
+    printf "\033[m\n"
+    exit 1
+  fi
+  if ${extended_checks}; then
+    echo_message "RELRO           STACK CANARY      NX            PIE             Clang CFI            SafeStack            RPATH      RUNPATH\tSymbols\t\tFILE\n" '' '' '{'
+  else
+    echo_message "RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH\tSymbols\t\tFILE\n" '' '' '{'
+  fi
+  filecheck "${CHK_FILE}"
+  if [ "$(find "${CHK_FILE}" \( -perm -004000 -o -perm -002000 \) -type f -print)" ] ; then
+    echo_message "\033[37;41m${CHK_FILE}\033[m\n" ",${CHK_FILE}\n" " filename='${CHK_FILE}'/>\n" " } }"
+  else
+    echo_message "${CHK_FILE}\n" ",${CHK_FILE}\n" " filename='${CHK_FILE}'/>\n" " } }"
+  fi
+}
+
+chk_file_list () {
+
+    if ${extended_checks}; then
+      echo_message "RELRO           STACK CANARY      NX            PIE             Clang CFI            SafeStack            RPATH      RUNPATH\tSymbols\t\tFILE\n" '' '' '{\n'
+    else
+      echo_message "RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH\tSymbols\t\tFILE\n" '' '' '{\n'
+    fi
+
+    while IFS="" read -r p || [ -n "${p}" ]
+    do
+      CHK_FILE="${p}"
+
+      if [ -z "${CHK_FILE}" ] ; then
+        printf "\033[31mError: Please provide a valid file.\033[m\n\n"
+      exit 1
+      fi
+
+      # does the file exist?
+      if [ ! -e "${CHK_FILE}" ] ; then
+        printf "\033[31mError: The file '%s' does not exist.\033[m\n\n" "${CHK_FILE}"
+        exit 1
+      fi
+
+      # read permissions?
+      if [ ! -r "${CHK_FILE}" ] ; then
+        printf "\033[31mError: No read permissions for '%s' (run as root).\033[m\n\n" "${CHK_FILE}"
+        exit 1
+      fi
+
+      # ELF executable?
+      out=$(file "$(readlink -f "${CHK_FILE}")")
+      if [ ! ${out} =~ ELF ] ; then
+        printf "\033[31mError: Not an ELF file: "
+        file "${CHK_FILE}"
+        printf "\033[m\n"
+        exit 1
+      fi
+      filecheck "${CHK_FILE}"
+      if [ "$(find "${CHK_FILE}" \( -perm -004000 -o -perm -002000 \) -type f -print)" ] ; then
+        echo_message "\033[37;41m${CHK_FILE}\033[m\n" ",${CHK_FILE}\n" " filename='${CHK_FILE}'/>\n" " } }"
+      else
+        echo_message "${CHK_FILE}\n" ",${CHK_FILE}\n" " filename='${CHK_FILE}'/>\n" " },\n"
+      fi
+
+    done <"${CHK_FILE_LIST}"
+
+    echo_message '' '' '' ' }\n'
+}
+
+chk_proc_all () {
+  check_procfs
+  cd /proc || exit
+  echo_message "* System-wide ASLR: " "" "" ""
+  aslrcheck
+  echo_message "* Does the CPU support NX: " "" "" ""
+  nxcheck
+  echo_message "* Crash dumps: " "" "" ""
+  coredumpcheck
+  if ${extended_checks}; then
+    echo_message "         COMMAND    PID RELRO           STACK CANARY            Clang CFI            SafeStack            BIND_NOW            NX            PIE        \n" "" "" '{'
+  else
+    echo_message "         COMMAND    PID RELRO           STACK CANARY            BIND_NOW            NX            PIE\n" "" "" '{'
+  fi
+  lastpid=0
+  currpid=0
+  for N in [1-9]*; do
+    if [ "${N}" != "$$" ] && readlink "${N}"/file > /dev/null; then
+      (( lastpid++ ))
+    fi
+  done
+  for N in [1-9]*; do
+    if [ "${N}" != "$$" ] && readlink "${N}"/file > /dev/null; then
+      (( currpid++ ))
+      name=$(head -1 "${N}"/status | awk '{print $1}')
+      if [ $format == "cli" ]; then
+        printf "%16s" "${name}"
+        printf "%7d " "${N}"
+      else
+        echo_message "" "${N}," " <proc pid='${N}'" " \"${N}\": { "
+        echo_message "" "${name}," " name='${name}'" "\"name\":\"${name}\","
+      fi
+      proccheck "${N}"
+  if [ "${lastpid}" == "${currpid}" ]; then
+    echo_message "\n" "\n" "</proc>\n" ""
+  else
+    echo_message "\n" "\n" "</proc>\n" ","
+  fi
+    fi
+  done
+  echo_message "" "" "</procs>" " }\n"
+  if [ ! -e /usr/bin/id ] ; then
+    echo_message "\n\033[33mNote: If you are running 'hbsd-checksec' as an unprivileged user, you\n" "" "" ""
+    echo_message "      will not see all processes. Please run the script as root.\033[m\n\n" "" "" "\n"
+  else
+    if ! (root_privs) ; then
+      echo_message "\n\033[33mNote: You are running 'hbsd-checksec' as an unprivileged user.\n" "" "" ""
+      echo_message "      Too see all processes, please run the script as root.\033[m\n\n" "" "" "\n"
+    fi
+  fi
+}
+
+chk_proc () {
+  if [ -z "${CHK_PROC}" ] ; then
+    printf "\033[31mError: Please provide a valid process name.\033[m\n\n"
+    exit 1
+  fi
+  if ! (isString "${CHK_PROC}") ; then
+    printf "\033[31mError: Please provide a valid process name.\033[m\n\n"
+    exit 1
+  fi
+  cd /proc || exit
+  IFS=" " read -r -a fpids <<<"$(pgrep -d ' ' "${CHK_PROC}")"
+  if [ ${#fpids} -eq 0 ]; then
+    printf "\033[31mError: No process with the given name found.\033[m\n\n"
+    exit 1
+  fi
+  echo_message "* System-wide ASLR" '' '' ''
+  aslrcheck
+  echo_message "* Does the CPU support NX: " '' '' ''
+  nxcheck
+  if ${extended_checks}; then
+    echo_message "         COMMAND    PID RELRO           STACK CANARY            Clang CFI            SafeStack            BIND_NOW            NX            PIE        \n" "" "" '{'
+  else
+    echo_message "         COMMAND    PID RELRO           STACK CANARY            BIND_NOW            NX            PIE\n" "" "" '{'
+  fi
+  pos=$(( ${#fpids[*]} - 1 ))
+  last=${fpids[$pos]}
+  for N in "${fpids[@]}"; do
+    if [ -d "${N}" ] ; then
+      name=$(head -1 "${N}"/status | awk '{print $1}')
+      if [ $format == "cli" ]; then
+        printf "%16s" "${name}"
+        printf "%7d " "${N}"
+      else
+        echo_message "" "${N}," "<proc pid='${N}'" " \"${N}\": {"
+        echo_message "" "${name}," " name='${name}'" "\"name\":\"${name}\","
+      fi
+      if [ ! -r "${N}/file" ] ; then
+        if ! (root_privs) ; then
+          printf "\033[31mNo read permissions for '/proc/%s/file' (run as root).\033[m\n\n" "${N}"
+          exit 1
+        fi
+        if [ ! "$(readlink "${N}/file")" ] ; then
+          printf "\033[31mPermission denied. Requested process ID belongs to a kernel thread.\033[m\n\n"
+          exit 1
+        fi
+        exit 1
+      fi
+      proccheck "${N}"
+      if [ "${N}" == "$last" ]; then
+        echo_message "\n" "\n" "</proc>\n" ""
+      else
+        echo_message "\n" "\n" "</proc>\n" ","
+      fi
+    fi
+  done
+  echo_message "\n" "\n" "\n" "}\n"
+}
+
+chk_proc_libs () {
+  if [ -z "${CHK_PROC_LIBS}" ] ; then
+    printf "\033[31mError: Please provide a valid process ID.\033[m\n\n"
+    exit 1
+  fi
+  if ! (isNumeric "${CHK_PROC_LIBS}") ; then
+    printf "\033[31mError: Please provide a valid process ID.\033[m\n\n"
+    exit 1
+  fi
+  cd /proc || exit
+  echo_message "* System-wide ASLR: " '' '' ''
+  aslrcheck
+  echo_message "* Does the CPU support NX: " '' '' ''
+  nxcheck
+  echo_message "* Process information:\n\n" "" "" ""
+  if ${extended_checks}; then
+    echo_message "         COMMAND    PID RELRO           STACK CANARY            Clang CFI            SafeStack            BIND_NOW        NX           PIE                     Fortify Source\n" '' '' ''
+  else
+    echo_message "         COMMAND    PID RELRO           STACK CANARY            BIND_NOW        NX           PIE                     Fortify Source\n" '' '' ''
+  fi
+  N=${CHK_PROC_LIBS}
+  if [ -d "${N}" ] ; then
+    name=$(head -1 "${N}/status" | awk '{print $1}')
+    if [ "${format}" == "cli" ]; then
+      printf "%16s" "${name}"
+      printf "%7d " "${N}"
+    else
+      echo_message "" "${name}," "<proc name='${name}'" "{ \"proc\": { \"name\":\"${name}\", "
+      echo_message "" "${N}," " pid='${N}'" "\"pid\":\"${N}\","
+    fi
+      # read permissions?
+    if [ ! -r "${N}/file" ] ; then
+      if ! (root_privs) ; then
+        printf "\033[31mNo read permissions for '/proc/%s/file' (run as root).\033[m\n\n" "${N}"
+        exit 1
+      fi
+      if [ ! "$(readlink "${N}"/file)" ] ; then
+        printf "\033[31mPermission denied. Requested process ID belongs to a kernel thread.\033[m\n\n"
+        exit 1
+      fi
+      exit 1
+    fi
+    proccheck "${N}"
+    echo_message "\n\n\n" "\n" "\n" ","
+    if ${extended_checks}; then
+      echo_message "    RELRO           STACK CANARY   Clang CFI            SafeStack              NX           PIE            Clang CFI            SafeStack            RPath       RunPath   \n" '' '' ''
+    else
+      echo_message "    RELRO           STACK CANARY   NX           PIE            RPath       RunPath   \n" '' '' ''
+    fi
+    libcheck "${N}"
+    echo_message "\n" "\n" "</proc>\n" "} } }"
+  fi
+}
+
+chk_kernel () {
+    if [ ${CHK_KERNEL} == "kernel" ]; then
+      CHK_KERNEL=""
+    fi
+    if [ -e "${CHK_KERNEL}" ] && [ ! -d "${CHK_KERNEL}" ]; then
+      if [ -s "$(pwd -P)/${CHK_KERNEL}" ]; then
+        configfile=$(pwd -P)/${CHK_KERNEL}
+      elif [ -s "${CHK_KERNEL}" ]; then
+        configfile=${CHK_KERNEL}
+      else
+        "Error: config file specified do not exist"
+        exit 1
+      fi
+      echo_message "* Kernel protection information for : $configfile \n\n" "" "" ""
+      cd /proc && kernelcheck "$configfile" || exit
+    else
+      cd /proc || exit
+      echo_message "* Kernel protection information:\n\n" "" "" ""
+      kernelcheck
+    fi
+}
+
+optspec=":h-:"
+while getopts "${optspec}" optchar; do
+    case "${optchar}" in
+        -)
+            case "${OPTARG}" in
+                version)
+                  version
+                  exit 0
+                  ;;
+                debug)
+                  debug=true
+                  ;;
+                trace)
+                  export BASH_XTRACEFD=5
+                  export PS4='(${BASH_SOURCE##*/}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+                  set -x
+                  ;;
+                help)
+                  help
+                  exit 0
+                  ;;
+                debug_report)
+                  debug_report
+                  exit 0
+                  ;;
+                format=*|output=*)
+                  output_format=${OPTARG#*=}
+                  format
+                  ;;
+                verbose)
+                  verbose=true
+                  ;;
+                no-extended)
+                  extended_checks=false
+                  ;;
+                dir=*|dir)
+                  CHK_DIR=${OPTARG#*=};
+                  OPT=$((OPT + 1))
+                  CHK_FUNCTION="chk_dir"
+                  ;;
+                file=*|file)
+                  CHK_FILE=${OPTARG#*=};
+                  OPT=$((OPT + 1))
+                  CHK_FUNCTION="chk_file"
+                  ;;
+                listfile=*|listfile)
+                  CHK_FILE_LIST=${OPTARG#*=};
+                  OPT=$((OPT + 1))                  
+                  CHK_FUNCTION="chk_file_list"
+                  ;;
+                proc-all)
+                  OPT=$((OPT + 1))
+                  CHK_FUNCTION="chk_proc_all"
+                  ;;
+                proc=*|proc)
+                  CHK_PROC=${OPTARG#*=};
+                  OPT=$((OPT + 1))
+                  CHK_FUNCTION="chk_proc"
+                  ;;
+                proc-libs=*|proc-libs)
+                  CHK_PROC_LIBS=${OPTARG#*=};
+                  OPT=$((OPT + 1))
+                  CHK_FUNCTION="chk_proc_libs"
+                  ;;
+                kernel=*|kernel)
+                  CHK_KERNEL=${OPTARG#*=};
+                  OPT=$((OPT + 1))
+                  CHK_FUNCTION="chk_kernel"
+                  ;;
+                *)
+                    printf "\033[31mError: Unknown option %s.\033[m\n\n" "${OPTARG}"
+                    exit 1
+                    ;;
+            esac;;
+        *)
+            help
+            exit 0
+            ;;
+    esac
+done
+
+if [ "${OPT}" == 0 ]; then
+  printf "\033[31mError: No option selected. Please select an option.\033[m\n\n"
+  exit 1
+elif [ "${OPT}" != 1 ]; then
+  printf "\033[31mError: To many options selected. Please select one at a time.\033[m\n\n"
+  exit 1
+fi
+
+for variable in CHK_DIR CHK_FILE CHK_PROC CHK_PROC_LIBS; do
+  if [[ -n ${!variable+x} ]]; then
+   if [ -z "${!variable}" ]; then
+     printf "\033[31mError: Option Required.\033[m\n\n"
+     help
+     exit 1
+   fi
+  fi
+done
+
+# call the function
+${CHK_FUNCTION}
