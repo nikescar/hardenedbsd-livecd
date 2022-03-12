@@ -36,7 +36,7 @@ import sys, os, re, socket
 import shutil
 from datetime import datetime
 import urllib.request, json
-from PyQt5 import QtWidgets, QtGui, QtCore # pkg install py38-qt5-widgets
+from PyQt5 import QtWidgets, QtGui, QtCore # pkg install py38-qt5-pyqt
 import disks # Privately bundled file
 
 import ssl
