@@ -35,7 +35,7 @@ wpa_supplicant_gui
 cpdup
 #avahi-app
 #nss_mdns
-py38-qt5-widgets
+py38-qt5-pyqt
 freedesktop-sound-theme
 gnumeric
 abiword
