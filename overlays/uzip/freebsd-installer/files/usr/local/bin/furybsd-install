@@ -95,9 +95,19 @@ chroot "${FSMNT}" rm /etc/rc.conf.local
 chroot "${FSMNT}" pw userdel liveuser
 chroot "${FSMNT}" pw groupdel liveuser
 chroot "${FSMNT}" rm -rf /usr/home/liveuser
+chroot "${FSMNT}" sed -i -r '/liveuser/d' /usr/local/etc/lightdm/lightdm.conf
 
 # Configure the new installation
 mount -t devfs devfs ${FSMNT}/dev
+
+# Apply HardenedBSD particularity
+chroot "${FSMNT}" hbsdcontrol pax disable pageexec /usr/local/lib/polkit-1/polkitd
+chroot "${FSMNT}" hbsdcontrol pax disable mprotect /usr/local/lib/polkit-1/polkitd
+chroot "${FSMNT}" hbsdcontrol pax disable pageexec /usr/local/bin/python3.8
+chroot "${FSMNT}" hbsdcontrol pax disable mprotect /usr/local/bin/python3.8
+chroot "${FSMNT}" hbsdcontrol pax disable mprotect /usr/local/lib/firefox/firefox
+chroot "${FSMNT}" hbsdcontrol pax disable pageexec /usr/local/lib/firefox/firefox
+chroot "${FSMNT}" hbsdcontrol pax disable mprotect /usr/local/lib/firefox/plugin-container
 
 # Disable direct root login; users in the wheel group can use sudo instead
 echo "Disabling direct root login; users in the wheel group can use sudo instead"
