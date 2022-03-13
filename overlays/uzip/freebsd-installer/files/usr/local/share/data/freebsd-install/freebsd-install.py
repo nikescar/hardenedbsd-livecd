@@ -110,7 +110,7 @@ def show_the_no_password_warning(sender):
 # https://doc.qt.io/qt-5/qwizard.html
 #############################################################################
 
-print(tr("Install FreeBSD"))
+print(tr("Install HardenedBSD"))
 
 app = QtWidgets.QApplication(sys.argv)
 
@@ -146,7 +146,7 @@ class InstallWizard(QtWidgets.QWizard, object):
         # self.setButtonLayout(
         #     [QtWidgets.QWizard.CustomButton1, QtWidgets.QWizard.Stretch, QtWidgets.QWizard.NextButton])
 
-        self.setWindowTitle(tr("Install FreeBSD"))
+        self.setWindowTitle(tr("Install HardenedBSD"))
         self.setFixedSize(800, 550)
 
         # Remove window decorations, especially the close button
@@ -199,10 +199,10 @@ class InstallWizard(QtWidgets.QWizard, object):
     def installerLogButtonClicked(self):
         print("Showing Installer Log")
         proc = QtCore.QProcess()
-        # command = 'xterm'
-        # args = ['-T', 'Installer Log', '-n', 'Installer Log', '+sb', '-geometry', '200x20', '-e', 'tail', '-f', self.logfile, self.errorslogfile]
-        command = 'launch'
-        args = ['QTerminal', '-e', 'tail', '-f', self.logfile, self.errorslogfile]
+        command = 'xterm'
+        args = ['-T', 'Installer Log', '-n', 'Installer Log', '+sb', '-geometry', '200x20', '-e', 'tail', '-f', self.logfile, self.errorslogfile]
+        #command = 'launch'
+        #args = ['QTerminal', '-e', 'tail', '-f', self.logfile, self.errorslogfile]
         print(args)
         try:
             proc.startDetached(command, args)
@@ -581,10 +581,10 @@ class IntroPage(QtWidgets.QWizardPage, object):
         print("Preparing IntroPage")
         super().__init__()
 
-        self.setTitle(tr('Install FreeBSD'))
-        self.setSubTitle(tr("To set up the installation of FreeBSD, click 'Continue'."))
+        self.setTitle(tr('Install HardenedBSD'))
+        self.setSubTitle(tr("To set up the installation of HardenedBSD, click 'Continue'."))
 
-        logo_pixmap = QtGui.QPixmap(os.path.dirname(__file__) + '/FREEBSD_Logo_Vert_Pos_RGB.png').scaledToHeight(200, QtCore.Qt.SmoothTransformation)
+        logo_pixmap = QtGui.QPixmap(os.path.dirname(__file__) + '/HARDENEDBSD_Logo_Vert_Pos_RGB.png').scaledToHeight(200, QtCore.Qt.SmoothTransformation)
         logo_label = QtWidgets.QLabel()
         logo_label.setPixmap(logo_pixmap)
 
@@ -600,7 +600,7 @@ class IntroPage(QtWidgets.QWizardPage, object):
 
         intro_label = QtWidgets.QLabel()
         intro_label.setWordWrap(True)
-        intro_label.setText(tr("FreeBSD is an operating system for a variety of platforms which focuses on features, speed, and stability. It is derived from BSD, the version of UNIX® developed at the University of California, Berkeley. It is developed and maintained by a large community."))
+        intro_label.setText(tr("Founded in 2014 by Oliver Pinter and Shawn Webb, HardenedBSD is a security-enhanced fork of FreeBSD."))
         intro_vLayout.addWidget(intro_label, True)  # True = add stretch vertically
 
         tm_label = QtWidgets.QLabel()
@@ -608,7 +608,7 @@ class IntroPage(QtWidgets.QWizardPage, object):
         font = wizard.font()
         font.setPointSize(8)
         tm_label.setFont(font)
-        tm_label.setText("The FreeBSD Logo and the mark FreeBSD are registered trademarks of The FreeBSD Foundation and are used by Simon Peter with the permission of The FreeBSD Foundation.")
+        tm_label.setText("The mark FreeBSD is a registered trademark of The FreeBSD Foundation and is used by HardenedBSD with the permission of The FreeBSD Foundation. Logo proudly designed by Hyper6.")
         intro_vLayout.addWidget(tm_label)
 
 
@@ -774,7 +774,7 @@ class DiskPage(QtWidgets.QWizardPage, object):
         reply = QtWidgets.QMessageBox.warning(
             wizard,
             tr("Warning"),
-            tr("This will erase all contents of this disk and install the FreeBSD operating system on it. Continue?"),
+            tr("This will erase all contents of this disk and install the HardenedBSD operating system on it. Continue?"),
             QtWidgets.QMessageBox.Yes,
             QtWidgets.QMessageBox.No,
         )
@@ -1106,8 +1106,8 @@ class InstallationPage(QtWidgets.QWizardPage, object):
         print("Preparing InstallationPage")
         super().__init__()
 
-        self.setTitle(tr('Installing FreeBSD'))
-        self.setSubTitle(tr('FreeBSD is being installed to your computer.'))
+        self.setTitle(tr('Installing HardenedBSD'))
+        self.setSubTitle(tr('HardenedBSD is being installed to your computer.'))
 
         self.timer = None
         self.installer_script_has_exited = False
@@ -1296,7 +1296,7 @@ class SuccessPage(QtWidgets.QWizardPage, object):
         layout.addWidget(center_widget, True)  # True = add stretch vertically
 
         label = QtWidgets.QLabel()
-        label.setText(tr("FreeBSD has been installed on your computer, click 'Restart' to begin using it."))
+        label.setText(tr("HardenedBSD has been installed on your computer, click 'Restart' to begin using it."))
         layout.addWidget(label)
 
         self.setButtonText(wizard.NextButton, tr("Restart"))
