@@ -98,7 +98,7 @@ base()
   fi
   if [ ! -f "${base}/kernel-fbsd.txz" ] ; then
     cd ${base}
-    fetch -v https://download.freebsd.org/ftp/snapshots/amd64/13.0-STABLE/kernel.txz -o kernel-fbsd.txz
+    fetch -v https://download.freebsd.org/ftp/snapshots/amd64/13.1-PRERELEASE/kernel.txz -o kernel-fbsd.txz
   fi
   cd ${base}
   tar -zxvf base.txz -C ${uzip}
