@@ -19,7 +19,7 @@ drm-kmod
 nvidia-driver
 mesa-libs
 mesa-dri
-open-vm-tools
+# open-vm-tools -> broken port in HBSD
 # virtualbox-ose-additions -> broken port in HBSD
 xauth
 xinit
