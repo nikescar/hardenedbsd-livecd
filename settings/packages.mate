@@ -1,8 +1,7 @@
-mate
-lightdm-gtk-greeter
-zenity
-networkmgr
-vlc
-kodi
-station-tweak
 ibus
+lightdm-gtk-greeter
+mate
+networkmgr
+station-tweak
+vlc
+zenity
