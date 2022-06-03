@@ -53,12 +53,12 @@ Burn the XFCE image to DVD:
 
 ```
 pkg install cdrtools
-cdrecord /usr/local/furybsd/iso/HardenedBSD-current-stable-XFCE-amd64.iso
+cdrecord /usr/local/hardenedbsd/iso/HardenedBSD-current-stable-XFCE-amd64.iso
 ```
 
 Write the XFCE image to USB stick:
 ```
-sudo dd if=/usr/local/furybsd/iso/HardenedBSD-current-stable-XFCE-amd64.iso of=/dev/daX bs=4m status=progress
+sudo dd if=/usr/local/hardenedbsd/iso/HardenedBSD-current-stable-XFCE-amd64.iso of=/dev/daX bs=4m status=progress
 ```
 
 ## Credentials for live media

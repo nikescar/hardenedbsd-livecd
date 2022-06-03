@@ -1,6 +1,6 @@
 #!/rescue/sh
 
-echo "==> rc ramdisk script"
+#echo "==> rc ramdisk script"
 
 if [ ! -e /dev/md2 ] ; then
     sh init.sh

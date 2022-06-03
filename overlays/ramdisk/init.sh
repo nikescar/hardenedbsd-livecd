@@ -2,29 +2,29 @@
 
 PATH="/rescue"
 
-echo "==> init.sh"
+#echo "==> init.sh"
 
 if [ "`ps -o command 1 | tail -n 1 | ( read c o; echo ${o} )`" = "-s" ]; then
 	echo "==> Running in single-user mode"
 	SINGLE_USER="true"
 fi
 
-echo "==> Remount rootfs as read-write"
+#echo "==> Remount rootfs as read-write"
 mount -u -w /
 
-echo "==> Make mountpoints"
+#echo "==> Make mountpoints"
 mkdir -p /cdrom
 
 echo "Waiting for HARDENEDBSD media to initialize"
 while : ; do
-    [ -e "/dev/iso9660/HARDENEDBSD" ] && echo "found /dev/iso9660/HARDENEDBSD" && break
+    [ -e "/dev/iso9660/HARDENEDBSD" ] && break
     sleep 1
 done
 
-echo "==> Mount cdrom"
+#echo "==> Mount cdrom"
 mount_cd9660 /dev/iso9660/HARDENEDBSD /cdrom
 mdconfig -f /cdrom/data/system.uzip -u 1
-zpool import -f furybsd -o readonly=on
+zpool import -f hardenedbsd -o readonly=on
 
 if [ "$SINGLE_USER" = "true" ]; then
         echo "Starting interactive shell in temporary rootfs ..."
@@ -42,7 +42,7 @@ fi
   exit 1
  fi
 
-echo "==> Mount swap-based memdisk"
+#echo "==> Mount swap-based memdisk"
 mdconfig -a -t swap -s 3g -u 2 >/dev/null 2>/dev/null
 gpart create -s GPT md2 >/dev/null 2>/dev/null
 gpart add -t freebsd-zfs md2 >/dev/null 2>/dev/null
@@ -51,7 +51,7 @@ zfs set compression=zstd-6 livecd
 zfs set primarycache=none livecd
 
 echo "==> Replicate system image to swap-based memdisk"
-zfs send -c -e furybsd | dd status=progress bs=1M | zfs recv -F livecd
+zfs send -c -e hardenedbsd | dd status=progress bs=1M | zfs recv -F livecd
 
 mount -t devfs devfs /livecd/dev
 chroot /livecd /usr/local/bin/furybsd-init-helper
