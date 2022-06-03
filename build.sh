@@ -7,7 +7,7 @@ version="13-stable"
 desktop=$1
 cwd=$(realpath | sed 's|/scripts||g')
 workdir="/usr/local"
-livecd="${workdir}/furybsd"
+livecd="${workdir}/hardenedbsd"
 if [ -z "${arch}" ] ; then
   arch=amd64
 fi
@@ -65,7 +65,7 @@ cleanup()
   else
     umount ${uzip}/var/cache/pkg >/dev/null 2>/dev/null || true
     umount ${uzip}/dev >/dev/null 2>/dev/null || true
-    zpool destroy -f furybsd >/dev/null 2>/dev/null || true
+    zpool destroy -f hardenedbsd >/dev/null 2>/dev/null || true
     mdconfig -d -u 0 >/dev/null 2>/dev/null || true
     rm ${livecd}/pool.img >/dev/null 2>/dev/null || true
     rm -rf ${cdroot} >/dev/null 2>/dev/null || true
@@ -79,14 +79,13 @@ workspace()
   mdconfig -f "${livecd}/pool.img" -u 0
   gpart create -s GPT md0
   gpart add -t freebsd-zfs md0
-  zpool create furybsd /dev/md0p1
-  zfs set mountpoint="${uzip}" furybsd
-  zfs set compression=zstd-9 furybsd
+  zpool create hardenedbsd /dev/md0p1
+  zfs set mountpoint="${uzip}" hardenedbsd
+  zfs set compression=zstd-9 hardenedbsd
 }
 
 base()
 {
-  # TODO: Signature checking
   if [ ! -f "${base}/base.txz" ] ; then 
     cd ${base}
     fetch -v https://ci-01.nyi.hardenedbsd.org/pub/hardenedbsd/${version}/${arch}/${arch}/BUILD-LATEST/base.txz
@@ -147,28 +146,13 @@ rc()
   cat "${cwd}/settings/rc.conf.${desktop}" | xargs chroot "${uzip}" sysrc -f /etc/rc.conf.local
 }
 
-
-repos()
-{
-  # This is just an example of how a git repo needs to be structured
-  # so that it can be consumed directly here
-  # if [ ! -d "${cwd}/overlays/uzip/furybsd-common-settings" ] ; then
-  #   git clone https://github.com/probonopd/furybsd-common-settings.git ${cwd}/overlays/uzip/furybsd-common-settings
-  # else
-  #   cd ${cwd}/overlays/uzip/furybsd-common-settings && git pull
-  # fi
-  true
-}
-
 user()
 {
   mkdir -p ${uzip}/usr/home/liveuser/Desktop
-  # chroot ${uzip} echo furybsd | chroot ${uzip} pw mod user root -h 0
   chroot ${uzip} pw useradd liveuser -u 1000 \
   -c "Live User" -d "/home/liveuser" \
   -g wheel -G operator -m -s /bin/csh -k /usr/share/skel -w none
   chroot ${uzip} pw groupadd liveuser -g 1000
-  # chroot ${uzip} echo furybsd | chroot ${uzip} pw mod user liveuser -h 0
   chroot ${uzip} chown -R 1000:1000 /usr/home/liveuser
   chroot ${uzip} pw groupmod wheel -m liveuser
   chroot ${uzip} pw groupmod video -m liveuser
@@ -211,14 +195,14 @@ pkg()
 uzip() 
 {
   install -o root -g wheel -m 755 -d "${cdroot}"
-  cd "${cwd}" && zpool export furybsd && while zpool status furybsd >/dev/null; do :; done 2>/dev/null
+  cd "${cwd}" && zpool export hardenedbsd && while zpool status hardenedbsd >/dev/null; do :; done 2>/dev/null
   mkuzip -A zstd -S -d -o "${cdroot}/data/system.uzip" "${livecd}/pool.img"
 }
 
 ramdisk() 
 {
   cp -R "${cwd}/overlays/ramdisk/" "${ramdisk_root}"
-  cd "${cwd}" && zpool import furybsd && zfs set mountpoint=/usr/local/furybsd/uzip furybsd
+  cd "${cwd}" && zpool import hardenedbsd && zfs set mountpoint=/usr/local/hardenedbsd/uzip hardenedbsd
   cd "${uzip}" && tar -cf - rescue | tar -xf - -C "${ramdisk_root}"
   touch "${ramdisk_root}/etc/fstab"
   cp ${uzip}/etc/login.conf ${ramdisk_root}/etc/login.conf
@@ -235,7 +219,7 @@ boot()
   for kfile in kernel geom_uzip.ko cryptodev.ko tmpfs.ko xz.ko zfs.ko; do
   tar -cf - boot/kernel/${kfile} boot/kernel-fbsd/${kfile} | tar -xf - -C "${cdroot}"
   done
-  cd "${cwd}" && zpool export furybsd && mdconfig -d -u 0
+  cd "${cwd}" && zpool export hardenedbsd && mdconfig -d -u 0
 }
 
 image()
@@ -247,7 +231,6 @@ image()
 
 cleanup
 workspace
-repos
 pkg
 base
 packages
