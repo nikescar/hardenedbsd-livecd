@@ -58,6 +58,7 @@ fi
 # Install contents of read only uzip to destination pool
 
 if [ -n "${INSTALLER_DEVICE}" ] ; then
+  fdisk -BI "${INSTALLER_DEVICE}"
   export ZFSBOOT_DISKS="${INSTALLER_DEVICE}"
   export ZFSBOOT_PARTITION_SCHEME="GPT"
   export ZFSBOOT_POOL_NAME="zroot"
