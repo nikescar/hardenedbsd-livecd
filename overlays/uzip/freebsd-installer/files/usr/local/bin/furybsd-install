@@ -104,8 +104,8 @@ mount -t devfs devfs ${FSMNT}/dev
 # Apply HardenedBSD particularity
 chroot "${FSMNT}" hbsdcontrol pax disable pageexec /usr/local/lib/polkit-1/polkitd
 chroot "${FSMNT}" hbsdcontrol pax disable mprotect /usr/local/lib/polkit-1/polkitd
-chroot "${FSMNT}" hbsdcontrol pax disable pageexec /usr/local/bin/python3.8
-chroot "${FSMNT}" hbsdcontrol pax disable mprotect /usr/local/bin/python3.8
+chroot "${FSMNT}" hbsdcontrol pax disable pageexec /usr/local/bin/python3.9
+chroot "${FSMNT}" hbsdcontrol pax disable mprotect /usr/local/bin/python3.9
 chroot "${FSMNT}" hbsdcontrol pax disable mprotect /usr/local/lib/firefox/firefox
 chroot "${FSMNT}" hbsdcontrol pax disable pageexec /usr/local/lib/firefox/firefox
 chroot "${FSMNT}" hbsdcontrol pax disable mprotect /usr/local/lib/firefox/plugin-container

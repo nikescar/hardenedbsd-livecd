@@ -17,7 +17,7 @@ octopkg
 open-vm-tools
 paxtest
 pkg
-py38-qt5-pyqt
+py39-qt5-pyqt
 setxkbmap
 sudo
 translate-toolkit
