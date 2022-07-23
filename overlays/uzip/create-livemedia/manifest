@@ -12,5 +12,5 @@ licenses:      [BSD]
 flatsize:      ${DIR_SIZE}
 desc:          Package that installs FuryBSD configuration
 categories:    [local]
-deps:          { py38-qt5-pyqt: { origin: "devel/py-qt5-pyqt", version: "5.15.4" } }
+deps:          { py39-qt5-pyqt: { origin: "devel/py-qt5-pyqt", version: "5.15.4" } }
 EOF

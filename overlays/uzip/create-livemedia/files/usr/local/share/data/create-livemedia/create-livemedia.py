@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env python3.9
 # Unfortunately python3 does not seem to work on FreeBSD
 
 # Create FuryBSD Live Media
@@ -36,7 +36,7 @@ import sys, os, re, socket
 import shutil
 from datetime import datetime
 import urllib.request, json
-from PyQt5 import QtWidgets, QtGui, QtCore # pkg install py38-qt5-pyqt
+from PyQt5 import QtWidgets, QtGui, QtCore # pkg install py39-qt5-pyqt
 import disks # Privately bundled file
 
 import ssl

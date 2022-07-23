@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env python3.9
 
 # Install FreeBSD
 # Copyright (c) 2020-21, Simon Peter <probono@puredarwin.org>
