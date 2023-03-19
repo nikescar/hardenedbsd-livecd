@@ -28,6 +28,11 @@ vol="hardenedbsd"
 label="HARDENEDBSD"
 export DISTRIBUTIONS="kernel.txz base.txz"
 
+HBSDINFRA_MIRROR="installers.hardenedbsd.org"
+HBSDINFRA_PREFIX="https://${HBSDINFRA_MIRROR}/pub/"
+HBSDINFRA_POSTFIX="installer/"
+HBSDINFRA_URLBASE="${HBSDINFRA_PREFIX}/${version}/${arch}/${arch}/${HBSDINFRA_POSTFIX}LATEST"
+
 # Only run as superuser
 if [ "$(id -u)" != "0" ]; then
   echo "This script must be run as root" 1>&2
@@ -88,12 +93,12 @@ base()
 {
   if [ ! -f "${base}/base.txz" ] ; then 
     cd ${base}
-    fetch -v https://ci-01.nyi.hardenedbsd.org/pub/hardenedbsd/${version}/${arch}/${arch}/BUILD-LATEST/base.txz
+    fetch -v ${HBSDINFRA_URLBASE}/base.txz
   fi
   
   if [ ! -f "${base}/kernel.txz" ] ; then
     cd ${base}
-    fetch -v https://ci-01.nyi.hardenedbsd.org/pub/hardenedbsd/${version}/${arch}/${arch}/BUILD-LATEST/kernel.txz
+    fetch -v ${HBSDINFRA_URLBASE}/kernel.txz
   fi
   if [ ! -f "${base}/kernel-fbsd.txz" ] ; then
     cd ${base}
